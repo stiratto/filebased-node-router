@@ -1,6 +1,5 @@
 import http from 'http'
 import { Router } from './router'
-import { cors } from './lib/utils';
 import resProto, { Response } from './lib/response';
 
 interface CorsOptions {
@@ -43,7 +42,6 @@ export class Server {
 
       console.log(`[${req.method}] ${req.url}`)
 
-      cors(req, res)
 
 
       this.router.handleRequest(req, res as ServerResponseAndPrototype)
