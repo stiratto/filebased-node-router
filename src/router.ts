@@ -1,8 +1,7 @@
-import http, { createServer, IncomingMessage, Server, ServerResponse } from "http"
+import { IncomingMessage, ServerResponse } from "http"
 import fs, { constants } from "fs"
-import { parse } from "url"
-import { send } from "./lib/utils"
 import path from "path"
+import { Response } from "./lib/response";
 
 // let's create a simple router from scratch that uses folder names as
 // routes, like next.js does
@@ -18,11 +17,25 @@ import path from "path"
 // a single route can contain various methods, each folder route will
 // have a file for each method (post.ts, get.ts, etc)
 //
+//
+// done:
+// - rest methods support
+//
+//
+// todo:
+//
+// - middlewares support
+// - dynamic routes support (folder named [id])
+// - wildcard support for routes
+// - websockets support
+//
+//
+// - better responses, send()
+//
 
 export const Method = ["POST", "GET", "PUT", "DELETE", "PATCH", "WEBSOCKET"] as const;
-type TMethod = typeof Method
 
-
+type TMethod = typeof Method[number]
 
 interface Route {
   path: string
@@ -41,29 +54,45 @@ export class Router {
   constructor() {
     this.routes = []
     this.controllers = []
-    this.readRoutes()
+    this.init()
   }
 
-  async handleRequest(req: IncomingMessage, res: ServerResponse) {
-    // console.log(this.routes)
-    console.log(this.controllers)
-    this.routes.map((route) => {
-      if (route.path === req.url) {
-        const correspondingHandler = this.controllers.find((controller) => controller.route.path === route.path)
+  async init() {
+    try {
+      await this.readRoutes()
+      await this.readMiddlewares()
+    } catch (err: any) {
+      throw new Error(err)
+    }
+  }
 
-        if (!correspondingHandler)
-          throw new Error("No handler for that route")
+  // executes when a request gets to the http.createServer in Server
+  // class
+  async handleRequest(req: IncomingMessage, res: ServerResponse & Response) {
 
-        if (!correspondingHandler.method as any === req.method)
-          throw new Error("Methods aren't matching")
 
-        const response = correspondingHandler.handler()
-        res.end(JSON.stringify(response))
-        return
+    const correspondingRoute = this.routes.find((route) => route.path === req.url)
+
+    if (correspondingRoute) {
+      const correspondingHandler = this.controllers.find((controller) => controller.route.path === correspondingRoute.path)
+
+      if (!correspondingHandler)
+        throw new Error("No handler for that route")
+
+      if (!(correspondingHandler.method === req.method))
+        throw new Error("Methods aren't matching")
+
+      const { status, data } = correspondingHandler.handler()
+
+      if (status >= 200 && status < 300) {
+        res.send(data, status)
       }
-    })
 
-
+      return
+    } else {
+      res.writeHead(404, { "Content-Type": "text/plain" })
+      res.end("Not Found")
+    }
   }
 
   private async readRoutes() {
@@ -97,13 +126,12 @@ export class Router {
 
         if (stat.isDirectory) {
           // if the folder is a directory, register routes inside and 
-          // read controllers too                                     
+          // read controllers too
 
           this.registerRoute(`/${folder}`)
           this.readControllers(folderPath, folder)
         }
       })
-
 
     } catch (err: any) {
       throw new Error(err)
@@ -162,10 +190,6 @@ export class Router {
 
       for (const [functionName, func] of Object.entries(functions)) {
 
-        // if (functionName !== 'main') {                                                                
-        //   throw new Error("Function's name must be main")                                             
-        // }                                                                                             
-
         if (func.length > 2) {
           throw new Error("Controller function handler must wait only 2 params: Request and Response.")
         }
@@ -181,6 +205,34 @@ export class Router {
 
 
     } catch (err: any) {
+      throw new Error(err)
+    }
+  }
+
+  private async readMiddlewares() {
+    try {
+      const middlewaresFolder = path.join(__dirname, "middlewares")
+
+      fs.access(middlewaresFolder, constants.F_OK, (err) => {
+        if (err)
+          throw new Error("Folder doesn't exists")
+
+      })
+
+
+      fs.access(middlewaresFolder, constants.R_OK, (err) => {
+        if (err)
+          throw new Error("Folder isn't readable")
+
+      })
+
+      const dir = fs.readdirSync(middlewaresFolder)
+
+      dir.map((file) => {
+        console.log(file)
+      })
+
+    } catch (err) {
       throw new Error(err)
     }
   }
