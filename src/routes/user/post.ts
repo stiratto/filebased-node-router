@@ -1,10 +1,12 @@
-import { send } from "@/lib/utils"
-import { IncomingMessage, ServerResponse } from "http"
+import { RequestWithPrototype } from "@/lib/request"
+import { ResponseWithPrototype } from "@/lib/response"
 
-const main = (req: IncomingMessage, res: ServerResponse) => {
+const main = (req: RequestWithPrototype, res: ResponseWithPrototype) => {
+  const { name, password } = req.body
+
   let connectedUsers = ["user1"]
-  connectedUsers.push("user2")
-  return connectedUsers
+  connectedUsers.push(name)
+  return { status: 200, data: connectedUsers }
 }
 
 module.exports = {

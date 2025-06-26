@@ -1,6 +1,10 @@
 import http from 'http'
-import { Router } from './router'
-import resProto, { Response } from './lib/response';
+import { Router } from '@/router'
+import { Parser } from '@/lib/parser';
+import resProto, { Response, ResponseWithPrototype } from '@/lib/response';
+import reqProto, { Request, RequestWithPrototype } from '@/lib/request';
+import { cors } from './lib/options';
+import { Logger } from './lib/logger';
 
 interface CorsOptions {
   enabled: boolean;
@@ -17,88 +21,54 @@ interface ExtraOptions {
 }
 
 type Options = http.ServerOptions & ExtraOptions
-type ServerResponseAndPrototype = http.ServerResponse & Response
 
 export class Server {
-  private httpServer: http.Server<typeof http.IncomingMessage, typeof http.ServerResponse & Response>
+  private httpServer: http.Server<typeof http.IncomingMessage & Request, typeof http.ServerResponse & Response>
   private router: Router;
   private options: Options;
+  private logger: Logger;
 
   constructor(port: number, options?: Options) {
+    this.logger = new Logger()
     this.options = options;
     this.init(port, options)
   }
 
   async init(port: number, options: Options = {}) {
     this.router = new Router()
+    this.httpServer = http.createServer(options, async (req: RequestWithPrototype, res: ResponseWithPrototype) => {
+      this.logger.info(`[${req.method}] ${req.url}`)
 
+      // inject extra methods and properties
+      this.injectMethodsAndProperties(req, res)
 
-    this.httpServer = http.createServer(options, (req, res) => {
-      Object.setPrototypeOf(res, resProto)
-
-      if (options) {
-        this.decideOptions(res as ServerResponseAndPrototype, req)
+      // parse the body if it's post method
+      if (req.method === "POST") {
+        const parser = new Parser(req, res)
+        await parser.init()
       }
 
-      console.log(`[${req.method}] ${req.url}`)
+      if (options) {
+        this.decideOptions(res as ResponseWithPrototype, req)
+      }
 
 
-
-      this.router.handleRequest(req, res as ServerResponseAndPrototype)
+      this.router.handleRequest(req, res as ResponseWithPrototype)
     })
 
     this.httpServer.listen(port)
   }
 
-  decideOptions(res: ServerResponseAndPrototype, req: http.IncomingMessage) {
+  injectMethodsAndProperties(req: RequestWithPrototype, res: ResponseWithPrototype) {
+    Object.setPrototypeOf(req, reqProto)
+    Object.setPrototypeOf(res, resProto)
+  }
+
+
+  decideOptions(res: ResponseWithPrototype, req: RequestWithPrototype) {
     const opts = this.options
 
     if (opts?.cors?.enabled)
-      this.cors(res, req)
-
+      cors(this.options, res, req)
   }
-
-
-  private cors(res: ServerResponseAndPrototype, req: http.IncomingMessage) {
-    const opts = this.options
-    // Access-Control-Allow-Origin
-    if (opts.cors.origin) {
-      res.setHeader("Access-Control-Allow-Origin", opts.cors.origin);
-    } else {
-      res.setHeader("Access-Control-Allow-Origin", "*");
-    }
-
-    // Access-Control-Allow-Credentials
-    if (opts.cors.credentials) {
-      res.setHeader("Access-Control-Allow-Credentials", "true");
-    }
-
-    // Access-Control-Max-Age
-    if (opts.cors.age) {
-      res.setHeader("Access-Control-Max-Age", opts.cors.age.toString());
-    }
-
-    // Access-Control-Allow-Methods
-    if (opts.cors.methods?.length) {
-      const methods = opts.cors.methods.map(m => m.toUpperCase()).join(",");
-      res.setHeader("Access-Control-Allow-Methods", methods);
-    } else {
-      res.setHeader("Access-Control-Allow-Methods", "GET,POST,DELETE,PUT,OPTIONS");
-    }
-
-    // Access-Control-Allow-Headers
-    const requestedHeaders = req.headers["access-control-request-headers"];
-    if (opts.cors.headers?.length) {
-      res.setHeader("Access-Control-Allow-Headers", opts.cors.headers.join(","));
-    } else if (requestedHeaders) {
-      res.setHeader("Access-Control-Allow-Headers", requestedHeaders);
-    }
-
-    // Access-Control-Expose-Headers
-    if (opts.cors.expose?.length) {
-      res.setHeader("Access-Control-Expose-Headers", opts.cors.expose.join(","));
-    }
-
-  }
-
 }
