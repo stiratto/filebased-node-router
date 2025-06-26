@@ -1,7 +1,8 @@
-import { IncomingMessage, ServerResponse } from "http"
+import { RequestWithPrototype } from '@/lib/request'
+import { IncomingMessage, ServerResponse } from 'http'
 //
 
-const index = (req: IncomingMessage, res: ServerResponse) => {
+const index = (req: RequestWithPrototype, res: ServerResponse) => {
   let id = crypto.randomUUID()
 
   let response = {
@@ -12,6 +13,5 @@ const index = (req: IncomingMessage, res: ServerResponse) => {
 }
 
 export default {
-  index
+  index,
 }
-

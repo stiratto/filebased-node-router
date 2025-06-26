@@ -1,7 +1,5 @@
-const main = () => {
-
-}
+const main = () => {}
 
 module.exports = {
-  main
+  main,
 }

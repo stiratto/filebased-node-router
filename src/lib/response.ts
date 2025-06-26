@@ -1,4 +1,4 @@
-import { ServerResponse } from "http"
+import { ServerResponse } from 'http'
 
 let res = Object.create(ServerResponse.prototype)
 
@@ -9,12 +9,8 @@ export type ResponseWithPrototype = ServerResponse & Response
 
 res.send = function(message: any, code = 200) {
   this.setHeader('Content-Type', 'application/json')
-
   this.statusCode = code
-
   this.end(JSON.stringify(message))
 }
 
-
 export default res
-

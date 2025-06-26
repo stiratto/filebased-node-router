@@ -1,37 +1,32 @@
-import busboy from "busboy";
-import { ServerResponseAndPrototype } from "@/server";
-import { ResponseWithPrototype } from "./response";
-import { RequestWithPrototype } from "./request";
-
-type ContentTypes =
-  "application/json"
-  | "application/x-www-form-urlencoded"
-  | "multipart/form-data"
+import busboy from 'busboy'
+import { ResponseWithPrototype } from './response'
+import { RequestWithPrototype } from './request'
+import { mimeTypes } from './consts'
+import { ContentTypes } from './types'
 
 export class Parser {
   contentType: ContentTypes
   data: Buffer
-  body: any;
-  req: RequestWithPrototype
-  res: ServerResponseAndPrototype
+  body: any
+  parsers: string[]
 
-  constructor(req: RequestWithPrototype, res: ResponseWithPrototype) {
-    this.req = req;
-    this.res = res;
+  constructor(req: RequestWithPrototype, res: ResponseWithPrototype, parsers: string[]) {
+    this.parsers = parsers
   }
 
-  async init(): Promise<any> {
-
+  async init(req: RequestWithPrototype, res: ResponseWithPrototype): Promise<any> {
     // if method is not post, return
-    if (!(this.req.method === "POST"))
-      return
+    if (!(req.method === 'POST')) return
 
     // extract headers and put them on this.
-    const contentType = this.req.headers['content-type']
-    this.contentType = contentType as ContentTypes
 
+    const contentType = req.headers['content-type']
+    // extract only the header (not boundary or encoding=utf)
+    const [baseType] = contentType.split(';').map(s => s.trim())
+    this.contentType = baseType as ContentTypes
 
     // so we dont get undefined on some cases of this.body
+
     if (
       this.contentType.includes("text/") ||
       this.contentType.includes("json") ||
@@ -44,116 +39,131 @@ export class Parser {
       this.body = Buffer.alloc(0)
     }
 
+    await this.handleData(req, res)
+  }
 
+  private async handleData(req: RequestWithPrototype, res: ResponseWithPrototype): Promise<any> {
+
+    // decide if the content-type from the request is supported in
+    // the server
+    this.isParserEnabled()
+
+    await this.parseBody(req, res)
+  }
+
+  private isParserEnabled() {
+    // maps the parsers configured by user to actual headers
+    const enabledTypes = this.parsers.map((p) => mimeTypes[p])
+
+    if (!enabledTypes.includes(this.contentType)) {
+      throw new Error(`Couldn't parse body with Content-Type ${this.contentType}, please enable it on Server config`)
+    }
+  }
+
+  private async parseBody(req: RequestWithPrototype, res: ResponseWithPrototype) {
     return new Promise((resolve) => {
-
-      // special handling for multipart/form-data
-      if (contentType.startsWith("multipart/form-data")) {
-        this.parseMultipart()
-      } else {
-        // if it's not multipart, let's treat it as text/plain or json
-        // or other that is not binary
-
-        this.req.on("data", (chunk) => {
+      // json case
+      if (this.contentType === "application/json") {
+        req.on('data', (chunk) => {
           this.onData(chunk)
         })
 
-        this.req.on("end", () => {
-          const data = this.end()
-          this.req.body = data
-          resolve(data)
+        req.on('end', () => {
+          req.body = JSON.parse(this.body)
+          resolve(this.data)
         })
-      }
 
+        // multipart case
+      } else if (this.contentType === 'multipart/form-data') {
+        return this.parseMultipart(req, res)
+        // url encoded case
+      } else if (this.contentType === 'application/x-www-form-urlencoded') {
+        return this.parseEncodedUrl()
+      }
     })
   }
 
   /**
-   * Populates the body instance variable to avoid reassigning
-   * body being undefined.
+   * When data reaches this server, add the chunks to body depending
+   * on the typeof body, if it's string, then we are dealing with JSON
+   * or other Content-Type that is not binary, else, it's binary.
    *
    * @returns Nothing
    */
-  private onData(chunk: Buffer | "string") {
+  private onData(chunk: Buffer | string) {
     if (typeof this.body === 'string') {
       this.body += chunk.toString()
     } else if (Buffer.isBuffer(this.body)) {
       this.body = Buffer.concat([this.body, chunk as Buffer])
     } else {
-      throw new Error("Unknown chunk type")
+      throw new Error('Unknown body type')
     }
   }
 
-
-  private parseMultipart() {
-
-    const bb = busboy({ headers: this.req.headers });
+  private parseMultipart(req: RequestWithPrototype, res: ResponseWithPrototype) {
+    req.body = {}
+    const bb = busboy({ headers: req.headers })
 
     bb.on('file', (name, file, info) => {
+      const { filename, encoding, mimeType } = info
+      let totalBytes = 0
+      let MAX_SIZE = 3 * 1024 * 1024
 
-      const { filename, encoding, mimeType } = info;
+      let image = Buffer.alloc(MAX_SIZE)
 
-      console.log(
-        `File [${name}]: filename: %j, encoding: %j, mimeType: %j`,
-        filename,
-        encoding,
-        mimeType
-      );
+      file
+        .on('data', (data) => {
+          // max size
+          totalBytes += data.length
+          if (totalBytes > MAX_SIZE) {
+            throw new Error(
+              `File is too big, max is ${MAX_SIZE / (1024 * 1024)}MB`
+            )
+          }
+          image = Buffer.concat([image, data])
+        })
+        .on('close', () => {
+          req.body[filename] = {
+            buffer: image,
+            filename,
+            encoding,
+            mimeType,
+          }
+          console.log(req.body[filename])
+        })
+    })
 
-      file.on('data', (data) => {
-        console.log(`File [${name}] got ${data.length} bytes`);
-      }).on('close', () => {
-        console.log(`File [${name}] done`);
-      });
+    bb.
+      on('field', (name, val, info) => {
+        req.body[name] = val
+      })
 
-    });
+    bb.
+      on('close', () => {
+        res.writeHead(303, { Connection: 'close', Location: '/' })
+        res.end()
+      })
 
-    bb.on('field', (name, val, info) => {
-      console.log(`Field [${name}]: value: %j`, val);
-    });
-
-    bb.on('close', () => {
-      console.log('Done parsing form!');
-      this.res.writeHead(303, { Connection: 'close', Location: '/' });
-      this.res.end();
-    });
-
-    this.req.pipe(bb)
+    req.pipe(bb)
   }
-
 
   /**
-  * Ends the request body parsing.
-  * Handles:
-  * - application/json
-  * - application/x-www-form-urlencoded
-  *
-  * @returns A JSON object or the raw body itself if no case found.
-  * 
-  */
-  private end() {
+   * Ends the request body parsing.
+   * Handles:
+   * - application/json
+   * - application/x-www-form-urlencoded
+   *
+   * @returns A JSON object or the raw body itself if no case found.
+   *
+   */
 
-    // Content-Type: 'application/json'
-    if (this.contentType === 'application/json')
-      try {
-        console.log(this.body)
-        return JSON.parse(this.body)
-      } catch (err) {
-        throw new Error("Invalid JSON")
-      }
-
-    // Content-Type: 'application/x-www-form-urlencoded'
-    if (this.contentType === 'application/x-www-form-urlencoded') {
-      const query = new URLSearchParams(this.body)
-      let constructedObject: Record<string, string> = {}
-      for (const [key, value] of query.entries()) {
-        constructedObject[key] = value
-      }
-
-      return constructedObject
+  private parseEncodedUrl() {
+    const query = new URLSearchParams(this.body)
+    let constructedObject: Record<string, string> = {}
+    for (const [key, value] of query.entries()) {
+      constructedObject[key] = value
     }
 
-    return this.body
+    return constructedObject
   }
-
 }
