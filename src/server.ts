@@ -40,7 +40,9 @@ export class Server {
   }
 
   async init(port: number, options: Options = {}) {
+
     this.router = new Router()
+
     this.httpServer = http.createServer(
       options,
       async (req: RequestWithPrototype, res: ResponseWithPrototype) => {
@@ -81,3 +83,4 @@ export class Server {
     if (opts?.cors?.enabled) cors(this.options, res, req)
   }
 }
+

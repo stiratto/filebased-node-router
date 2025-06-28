@@ -4,3 +4,11 @@ export const mimeTypes = {
   urlencoded: 'application/x-www-form-urlencoded'
 } satisfies Record<string, string>
 
+export const Method = [
+  'POST',
+  'GET',
+  'PUT',
+  'DELETE',
+  'PATCH',
+  'WEBSOCKET',
+] as const

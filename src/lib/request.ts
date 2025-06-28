@@ -10,6 +10,7 @@ export interface Request {
   // Just for typescript to be happy in files that we access
   // `req.body`
   body: any;
+  testField: any;
 }
 
 export type RequestWithPrototype = IncomingMessage & Request

@@ -4,6 +4,8 @@
     "paths": {
       "@/*": ["./src/*"]
     },
+    "target": "ES5",
+    "downlevelIteration": true,
     "esModuleInterop": true
   }
 }
