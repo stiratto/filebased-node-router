@@ -7,18 +7,37 @@ import { Method } from './lib/consts'
 import { TMethod } from './lib/types'
 import { Controller, Route } from './lib/interfaces'
 
+
+class RouteTrieNode {
+
+  children: Map<string, RouteTrieNode>
+  endOfPath: boolean;
+  isDynamic: boolean;
+  segment: string;
+
+
+  constructor() {
+    this.children = new Map()
+    this.endOfPath = false
+    this.isDynamic = false
+    this.segment = ""
+  }
+}
+
 export class Router {
-  private routes: Map<string, Map<string, Controller>> = new Map()
+  private routes: RouteTrieNode
   private logger: Logger
 
   constructor() {
     this.logger = new Logger()
+    this.routes = new RouteTrieNode()
     this.init()
   }
 
   async init() {
     try {
       await this.readRoutes()
+
     } catch (err: any) {
       throw new Error(err)
     }
@@ -27,23 +46,25 @@ export class Router {
   // executes when a request gets to the http.createServer in Server
   // class
   async handleRequest(req: RequestWithPrototype, res: ResponseWithPrototype) {
-    console.log(this.routes)
+
+    const segments = req.url.split("/")
 
     // finds the correct route
-    const correspondingRoute = this.routes.get(req.url)
+    //
+    const correspondingRoute = this.routeExists(segments)
 
     if (correspondingRoute) {
       // finds the controller inside that route that has the same
       // method that the request has
-      const controller = correspondingRoute.get(req.method)
+      const controller = 'asd'
 
       if (!controller) throw new Error('Method not allowed')
-
-      const { status, data } = controller.handler(req, res)
-
-      if (status >= 200 && status < 300) {
-        res.send(data, status)
-      }
+      //
+      // const { status, data } = controller.handler(req, res)
+      //
+      // if (status >= 200 && status < 300) {
+      //   res.send(data, status)
+      // }
 
     } else {
       res.writeHead(404, { 'Content-Type': 'text/plain' })
@@ -51,38 +72,69 @@ export class Router {
     }
   }
 
+  // TODO
+  routeExists(segments: string[]) {
+
+  }
+
+
+  private logRoutes(node: any, currentPath: string[] = []) {
+    const currPath = currentPath.join("/")
+
+    for (const [segment, childNode] of node.children.entries()) {
+      this.logger.info(`${node.segment} ${node.isDynamic} ${node.endOfPath}`)
+      const newPath = [...currentPath, segment];
+      this.logRoutes(childNode, newPath)
+    }
+  }
+
   /** 
-   * Reads all routes in routes/ folder.
+   * Reads all routes in src/routes/ using recursivity.
    *
    * @returns empty
    */
-  private async readRoutes() {
+
+  private async readRoutes(startingPath: string = "routes") {
     try {
 
-      // all routes must be here, in folders
-      const folderRootPath = path.join(__dirname, 'routes')
+      let routesRootFolder = path.join(__dirname, "routes")
+      // if path is absolute it means we are in a nested directory
+      // (nested route)
+      let rootFolder = startingPath
 
-      fs.access(folderRootPath, constants.F_OK | constants.R_OK, (err) => {
-        if (err) throw new Error("Folder doesn't exists or is not readable")
-      })
-
-      // read folders 
-      const routes = fs.readdirSync(folderRootPath)
-
-      for (const route of routes) {
-        // get the absolute path of the current folder               
-        const absoluteRoutePath = path.join(folderRootPath, route)
-
-        // get the stats of the current folder                       
-        const stat = fs.statSync(absoluteRoutePath)
-
-        // if folder is a directory, register the route and read the 
-        // controllers of that route                                 
-        if (stat.isDirectory()) {
-          this.registerRoute(absoluteRoutePath, `/${route}`)
-        }
-
+      if (!path.isAbsolute(startingPath)) {
+        rootFolder = path.join(__dirname, startingPath)
       }
+
+      const currentFolderFiles = fs.readdirSync(rootFolder)
+
+      // base case
+      if (currentFolderFiles.length <= 0) {
+        return
+      }
+
+      for (const file of currentFolderFiles) {
+
+        const isCurrentFileDirectory = fs.statSync(path.join(rootFolder, file)).isDirectory()
+
+        if (isCurrentFileDirectory) {
+
+          const pathOfThisFolder = path.resolve(rootFolder, file)
+
+          const relative = path.relative(routesRootFolder, pathOfThisFolder)
+
+          const segments = relative.split("/").map((segment) => {
+            if (segment.includes("[") && segment.includes("]")) {
+              return segment.replace("[", ":").replace("]", "")
+            }
+            return segment
+          })
+
+          this.registerRoute(segments)
+          this.readRoutes(pathOfThisFolder)
+        }
+      }
+
 
     } catch (err: any) {
       throw new Error(err)
@@ -99,72 +151,82 @@ export class Router {
   *
   */
 
-  private async registerRoute(absoluteRoutePath: string, routePath: string) {
+  private async registerRoute(segments: string[]) {
+    // this is for the loop
+    let curr = this.routes
+
     try {
+      segments.forEach((segment, index) => {
 
-      this.logger.log(`Registering route: ${routePath}`)
 
-      // if route doesn't exists yet
-      if (!this.routes.has(routePath)) {
-        this.routes.set(routePath, new Map<string, Controller>())
-      }
+        if (!curr.children.has(segment)) {
+          // segment does not exists, create that segment        
+          curr.children.set(segment, new RouteTrieNode())
 
-      const methodMap = this.routes.get(routePath)
-
-      const controllers = await this.readControllers(absoluteRoutePath)
-
-      for (const [method, handler] of controllers.entries()) {
-
-        if (methodMap.has(method)) {
-          this.logger.error(`Route ${routePath} already has method ${method} registered`)
         }
 
-        methodMap.set(method, handler)
-      }
+        if (segment.includes(":")) {
+          curr.isDynamic = true
+        }
+        curr.segment = segment
+        // segment exists, nested route                        
+        curr = curr.children.get(segment)
+
+      })
+      curr.endOfPath = true
 
     } catch (err: any) {
-      throw new Error(err)
+      this.logger.error(err)
+      throw err
     }
   }
 
 
   private async readControllers(absoluteRoutePath: string) {
-    try {
-      // read the directory of the current folder
+    // read the directory of the current folder
 
-      const folder = path.basename(absoluteRoutePath)
+    // current folder name
+    const folder = path.basename(absoluteRoutePath)
+    this.logger.info(`Reading controllers of route /${folder}`)
+    // current folder files
+    const files = fs.readdirSync(absoluteRoutePath)
+    let controllers = new Map<string, Controller>()
 
-      const files = fs.readdirSync(absoluteRoutePath)
+    // we can have folders inside folders, so check if file is not a
+    // folder
+    for (const file of files) {
 
-      let controllers = new Map<string, Controller>()
+      const filePath = path.join(absoluteRoutePath + "/" + file)
+      const fileStat = fs.statSync(filePath)
 
-      for (const file of files) {
-
-        // get only the file name, without the extension                                                          
-        const indexOfLastDot = file.lastIndexOf('.')
-        const method = file
-          .slice(0, indexOfLastDot)
-          .toUpperCase() as (typeof Method)[number]
-
-        // file name must be a method name                                                                        
-        if (!Method.includes(method)) {
-          this.logger.log(`File ${file} is not a valid controller, check the filename maybe?`)
-          throw new Error()
-        }
-
-        const route: Route = {
-          path: `/${folder}`,
-        }
-
-        const { controller } = await this.registerController(method as unknown as TMethod, route)
-        controllers.set(method, controller)
+      if (fileStat.isDirectory()) {
+        continue
       }
 
-      return controllers
 
-    } catch (err: any) {
-      throw new Error(err)
+      // get only the file name, without the extension
+      const indexOfLastDot = file.lastIndexOf('.')
+      const method = file
+        .slice(0, indexOfLastDot)
+        .toUpperCase() as (typeof Method)[number]
+
+      // file name must be a method name                                                                       
+      if (!Method.includes(method)) {
+        this.logger.error(`File ${file} is not a valid controller, check the filename maybe?`)
+        throw new Error()
+      }
+
+      const route: Route = {
+        path: `/${folder}`,
+      }
+
+      const { controller } = await this.registerController(method as unknown as TMethod, route)
+      controllers.set(method, controller)
     }
+
+    return controllers
+
+
   }
 
   private async registerController(method: TMethod, route: Route) {

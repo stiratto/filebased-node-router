@@ -17,8 +17,18 @@ export class Logger {
     this._print(message, '32')
   }
 
-  error(message: string) {
-    this._print(message, '31')
+  error(message?: string, error?: any) {
+    if (error) {
+      this._print(`${error.stack}`, '31')
+    }
+
+    if (message) {
+      this._print(`${message}`, '31')
+    }
+
+    if (error && message) {
+      this._print(`${message} ${error.stack}`, '31')
+    }
   }
 
   info(message: string) {

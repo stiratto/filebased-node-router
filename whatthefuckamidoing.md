@@ -66,17 +66,36 @@ src/
 
 ///
 
-Llega una request. Esa request tiene el url /user/42/profile (obtiene
-el perfil del usuario con id 42).
-Para manejar esa request, tiene que haber una ruta
-/user/[id]/profile/get.ts
 
-COMO MAPEAR /user/42/profile (URL REAL) A /user/[id]/profile/get.ts
-                            path || method - handler
-Actualmente tenemos un Map<string, Map<string, Controller>>
+Para guardar las rutas usaremos un Trie.
+                               path    nested paths
+TrieNode.children sera un Map<string, RouteTrieNode>
+Para registrar una ruta utilizamos segmentos.
+Un segment es una parte del path. 
+/user/id = ["user", "id"]
+/user/[id] = ["user", ":id"]
 
-/user/[id]/profile
+Al registrar una ruta, loopeamos en todos los segmentos de la ruta que
+queremos registrar.
+Revisamos si el Trie tiene una key con el segmento actual.
+Si no lo tiene, registramos ese segmento con un RouteTrieNode vacio.
 
+Si lo tiene, registramos el segmento siguiente en ese RouteTrieNode,
+seria un hijo, una nested route
+
+--- 
+Loopear el Trie y hacer algo con cada ruta ya existente.
+Empezamos desde el root
+let curr = this.routes
+Aqui, curr seria el nodo root.
+curr.children contiene todos los hashmaps con las rutas
+
+'getId': RouteTrieNode
+'user': RouteTrieNode
+
+Loop en curr.children.entries()
+Esto nos da acceso al segment y al nodo hijo, a las nested routes
+Podemos usar recursividad. logRoutes(node)
 
 
 ---
