@@ -1,13 +1,9 @@
-import { TMethod } from "./types"
-
 export interface Route {
-  path: string
-  middlewares?: Function[]
-  controllers?: Controller[]
+  path: string;
+  middlewares?: (() => any)[];
+  controllers?: Controller[];
 }
 
 export interface Controller {
-  handler: Function
+  handler: () => any;
 }
-
-

@@ -100,3 +100,44 @@ Podemos usar recursividad. logRoutes(node)
 
 ---
 
+
+
+
+## Como verificar si una ruta ya existe?
+Rutas a tomar en cuenta:
+/user/getId 1
+/user/[id] 2
+
+/user/profile/[id] 2
+/user/profile 1
+
+Rutas estaticas tienen mas prioridad (campo isDynamic en cada TrieNode)
+
+Llega req.url = /user/getId, como verificamos si existe?
+> routeExists(['user', 'getId'])
+
+Hay que recorrer el trie. Para cada segmento que viene en la url,
+verificamos si existe en curr.children.
+
+Si no existe: Verificar si curr es una ruta dinamica. Si lo es,
+continuar con esa ruta. Si no, return.
+Solo vamos a retornar si hasControllers = true.
+
+
+```
+           
+
+
+```
+
+
+
+
+
+
+
+
+
+
+
+

@@ -1,7 +1,5 @@
 const main = () => {
-  return { status: 200, data: "Pene" }
-}
+  return { status: 200, data: 'Pene' };
+};
 
-export {
-  main
-}
+export { main };

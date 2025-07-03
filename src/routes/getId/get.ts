@@ -1,17 +1,18 @@
-import { RequestWithPrototype } from '@/lib/request'
-import { IncomingMessage, ServerResponse } from 'http'
+import { IncomingMessage, type ServerResponse } from 'http';
+import type { RequestWithPrototype } from '@/lib/request';
+
 //
 
 const index = (req: RequestWithPrototype, res: ServerResponse) => {
-  let id = crypto.randomUUID()
+  const id = crypto.randomUUID();
 
-  let response = {
+  const response = {
     id,
-  }
+  };
 
-  return { status: 200, data: response }
-}
+  return { status: 200, data: response };
+};
 
 export default {
   index,
-}
+};

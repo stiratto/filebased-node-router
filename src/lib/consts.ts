@@ -1,8 +1,8 @@
 export const mimeTypes = {
   json: 'application/json',
   multipart: 'multipart/form-data',
-  urlencoded: 'application/x-www-form-urlencoded'
-} satisfies Record<string, string>
+  urlencoded: 'application/x-www-form-urlencoded',
+} satisfies Record<string, string>;
 
 export const Method = [
   'POST',
@@ -11,4 +11,4 @@ export const Method = [
   'DELETE',
   'PATCH',
   'WEBSOCKET',
-] as const
+] as const;

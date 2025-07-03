@@ -1,86 +1,100 @@
-import busboy from 'busboy'
-import { ResponseWithPrototype } from './response'
-import { RequestWithPrototype } from './request'
-import { mimeTypes } from './consts'
-import { ContentTypes } from './types'
+import busboy from 'busboy';
+import { mimeTypes } from './consts';
+import type { RequestWithPrototype } from './request';
+import type { ResponseWithPrototype } from './response';
+import type { ContentTypes } from './types';
 
 export class Parser {
-  contentType: ContentTypes
-  data: Buffer
-  body: any
-  parsers: string[]
+  contentType: ContentTypes;
+  data: Buffer;
+  body: any;
+  parsers: string[];
 
-  constructor(req: RequestWithPrototype, res: ResponseWithPrototype, parsers: string[]) {
-    this.parsers = parsers
+  constructor(
+    req: RequestWithPrototype,
+    res: ResponseWithPrototype,
+    parsers: string[]
+  ) {
+    this.parsers = parsers;
   }
 
-  async init(req: RequestWithPrototype, res: ResponseWithPrototype): Promise<any> {
+  async init(
+    req: RequestWithPrototype,
+    res: ResponseWithPrototype
+  ): Promise<any> {
     // if method is not post, return
-    if (!(req.method === 'POST')) return
+    if (!(req.method === 'POST')) return;
 
     // extract headers and put them on this.
 
-    const contentType = req.headers['content-type']
+    const contentType = req.headers['content-type'];
     // extract only the header (not boundary or encoding=utf)
-    const [baseType] = contentType.split(';').map(s => s.trim())
-    this.contentType = baseType as ContentTypes
+    const [baseType] = contentType.split(';').map((s) => s.trim());
+    this.contentType = baseType as ContentTypes;
 
     // so we dont get undefined on some cases of this.body
 
     if (
-      this.contentType.includes("text/") ||
-      this.contentType.includes("json") ||
-      this.contentType.includes("x-www-form-urlencoded") ||
-      this.contentType.includes("xml") ||
-      this.contentType.includes("javascript")
+      this.contentType.includes('text/') ||
+      this.contentType.includes('json') ||
+      this.contentType.includes('x-www-form-urlencoded') ||
+      this.contentType.includes('xml') ||
+      this.contentType.includes('javascript')
     ) {
-      this.body = ""
+      this.body = '';
     } else {
-      this.body = Buffer.alloc(0)
+      this.body = Buffer.alloc(0);
     }
 
-    await this.handleData(req, res)
+    await this.handleData(req, res);
   }
 
-  private async handleData(req: RequestWithPrototype, res: ResponseWithPrototype): Promise<any> {
-
+  private async handleData(
+    req: RequestWithPrototype,
+    res: ResponseWithPrototype
+  ): Promise<any> {
     // decide if the content-type from the request is supported in
     // the server
-    this.isParserEnabled()
+    this.isParserEnabled();
 
-    await this.parseBody(req, res)
+    await this.parseBody(req, res);
   }
 
   private isParserEnabled() {
     // maps the parsers configured by user to actual headers
-    const enabledTypes = this.parsers.map((p) => mimeTypes[p])
+    const enabledTypes = this.parsers.map((p) => mimeTypes[p]);
 
     if (!enabledTypes.includes(this.contentType)) {
-      throw new Error(`Couldn't parse body with Content-Type ${this.contentType}, please enable it on Server config`)
+      throw new Error(
+        `Couldn't parse body with Content-Type ${this.contentType}, please enable it on Server config`
+      );
     }
   }
 
-  private async parseBody(req: RequestWithPrototype, res: ResponseWithPrototype) {
+  private async parseBody(
+    req: RequestWithPrototype,
+    res: ResponseWithPrototype
+  ) {
     return new Promise((resolve) => {
       // json case
-      if (this.contentType === "application/json") {
+      if (this.contentType === 'application/json') {
         req.on('data', (chunk) => {
-          this.onData(chunk)
-        })
+          this.onData(chunk);
+        });
 
         req.on('end', () => {
-          req.body = JSON.parse(this.body)
-          resolve(this.data)
-        })
+          req.body = JSON.parse(this.body);
+          resolve(this.data);
+        });
 
         // multipart case
       } else if (this.contentType === 'multipart/form-data') {
-        return this.parseMultipart(req, res)
+        return this.parseMultipart(req, res);
         // url encoded case
       } else if (this.contentType === 'application/x-www-form-urlencoded') {
-        return this.parseEncodedUrl()
+        return this.parseEncodedUrl();
       }
-    })
+    });
   }
 
   /**
@@ -92,35 +106,38 @@ export class Parser {
    */
   private onData(chunk: Buffer | string) {
     if (typeof this.body === 'string') {
-      this.body += chunk.toString()
+      this.body += chunk.toString();
     } else if (Buffer.isBuffer(this.body)) {
-      this.body = Buffer.concat([this.body, chunk as Buffer])
+      this.body = Buffer.concat([this.body, chunk as Buffer]);
     } else {
-      throw new Error('Unknown body type')
+      throw new Error('Unknown body type');
     }
   }
 
-  private parseMultipart(req: RequestWithPrototype, res: ResponseWithPrototype) {
-    req.body = {}
-    const bb = busboy({ headers: req.headers })
+  private parseMultipart(
+    req: RequestWithPrototype,
+    res: ResponseWithPrototype
+  ) {
+    req.body = {};
+    const bb = busboy({ headers: req.headers });
 
     bb.on('file', (name, file, info) => {
-      const { filename, encoding, mimeType } = info
-      let totalBytes = 0
-      let MAX_SIZE = 3 * 1024 * 1024
+      const { filename, encoding, mimeType } = info;
+      let totalBytes = 0;
+      const MAX_SIZE = 3 * 1024 * 1024;
 
-      let image = Buffer.alloc(MAX_SIZE)
+      let image = Buffer.alloc(MAX_SIZE);
 
       file
         .on('data', (data) => {
           // max size
-          totalBytes += data.length
+          totalBytes += data.length;
           if (totalBytes > MAX_SIZE) {
             throw new Error(
               `File is too big, max is ${MAX_SIZE / (1024 * 1024)}MB`
-            )
+            );
           }
-          image = Buffer.concat([image, data])
+          image = Buffer.concat([image, data]);
         })
         .on('close', () => {
           req.body[filename] = {
@@ -128,23 +145,21 @@ export class Parser {
             filename,
             encoding,
             mimeType,
-          }
-          console.log(req.body[filename])
-        })
-    })
+          };
+          console.log(req.body[filename]);
+        });
+    });
 
-    bb.
-      on('field', (name, val, info) => {
-        req.body[name] = val
-      })
+    bb.on('field', (name, val, info) => {
+      req.body[name] = val;
+    });
 
-    bb.
-      on('close', () => {
-        res.writeHead(303, { Connection: 'close', Location: '/' })
-        res.end()
-      })
+    bb.on('close', () => {
+      res.writeHead(303, { Connection: 'close', Location: '/' });
+      res.end();
+    });
 
-    req.pipe(bb)
+    req.pipe(bb);
   }
 
   /**
@@ -158,12 +173,12 @@ export class Parser {
    */
 
   private parseEncodedUrl() {
-    const query = new URLSearchParams(this.body)
-    let constructedObject: Record<string, string> = {}
+    const query = new URLSearchParams(this.body);
+    const constructedObject: Record<string, string> = {};
     for (const [key, value] of query.entries()) {
-      constructedObject[key] = value
+      constructedObject[key] = value;
     }
 
-    return constructedObject
+    return constructedObject;
   }
 }
