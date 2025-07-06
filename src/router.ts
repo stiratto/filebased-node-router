@@ -58,10 +58,8 @@ export class Router {
     // finds the correct route
     const correspondingRoute = this.routeExists(
       // for some reason there is an empty segment
-      segments.filter((v) => v != '')
+      segments!.filter((v) => v != '')
     );
-
-
 
     if (correspondingRoute) {
       this.logger.info(`Route ${correspondingRoute.segment} exists`)
@@ -79,7 +77,6 @@ export class Router {
     }
   }
 
-  // TODO
   routeExists(segments: string[]): RouteTrieNode | null {
     let curr = this.routes;
 
