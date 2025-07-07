@@ -6,3 +6,4 @@ export type ContentTypes =
   | 'multipart/form-data';
 
 export type TMethod = (typeof Method)[number];
+

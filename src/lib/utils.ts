@@ -7,7 +7,8 @@ export const pad = (n: number) => {
 };
 
 export const transformPathIntoSegments = (rawPath: string) =>
-  rawPath.split('/').map((segment) => {
+
+  rawPath.split(path.sep).map((segment) => {
     if (segment.includes('[') && segment.includes(']')) {
       return segment.replace('[', ':').replace(']', '');
     }
