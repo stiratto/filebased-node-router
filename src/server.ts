@@ -62,6 +62,9 @@ export class Server {
           await parser.init(req, res);
         }
 
+        req.params = null
+        req.query = null
+
         if (options) {
           this.decideOptions(res as ResponseWithPrototype, req);
         }

@@ -27,3 +27,13 @@ export const fileIsController = (filePath: string) => {
 
   return true;
 };
+
+export const joinSegments = (segments: string[]) => segments.map((segment) => {
+  if (segment.includes(":")) {
+    let newSegment = segment.replace(":", "[")
+    let st = newSegment.split('')
+    st.push(']')
+    return st.join("")
+  }
+  return segment
+})

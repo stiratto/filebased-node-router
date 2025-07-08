@@ -1,3 +1,6 @@
+import { RequestWithPrototype } from "./request";
+import { ResponseWithPrototype } from "./response";
+
 export interface Route {
   path: string;
   middlewares?: (() => any)[];
@@ -5,5 +8,5 @@ export interface Route {
 }
 
 export interface Controller {
-  handler: () => any;
+  handler: (req?: RequestWithPrototype, res?: ResponseWithPrototype) => any;
 }

@@ -10,6 +10,8 @@ export interface Request {
   // Just for typescript to be happy in files that we access
   // `req.body`
   body: any;
+  params: any
+  query: any
 }
 
 export type RequestWithPrototype = IncomingMessage & Request;
