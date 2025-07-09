@@ -134,6 +134,28 @@ Solo vamos a retornar si hasControllers = true.
 
 
 
+Que tenemos hasta ahora:
+
+Rutas estaticas
+Rutas dinamicas
+Ruta dinamica catchall
+
+
+Por hacer:
+
+- Middlewares
+- Buen soporte para metodos HTTP
+
+
+
+
+
+
+
+
+
+
+
 
 
 

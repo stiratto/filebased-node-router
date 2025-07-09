@@ -65,7 +65,7 @@ export class RouteLoader {
 				// a normal file like a controller)
 				const pathOfThisFolder = path.resolve(rootFolder, folder);
 
-				const controllers = fs.readdirSync(pathOfThisFolder);
+				const controllers = await fs.promises.readdir(pathOfThisFolder);
 				// if route doesn't has controllers, mark that route in the
 				// TrieNode as hasControllers = false
 				let hasControllers = false;
@@ -134,6 +134,10 @@ export class RouteLoader {
 					curr.isDynamic = true;
 				}
 
+				if (segment.includes('...')) {
+					curr.isCatchAll = true
+				}
+
 				curr.segment = segment;
 
 				// if the current segment index is equal to the last index of
@@ -147,6 +151,7 @@ export class RouteLoader {
 				}
 			});
 
+			console.log(curr)
 			this.readControllers(segments, curr)
 		} catch (err: any) {
 			this.logger.error(err);
@@ -247,7 +252,7 @@ export class RouteLoader {
 
 				if (!this.isValidHttpMethodFile(file)) {
 					this.logger.error("File is not a valid HTTP method")
-					throw new Error("File is not a valid HTTP method")
+					continue
 				}
 
 				const method = this.parseHttpMethod(file)

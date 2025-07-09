@@ -12,6 +12,7 @@ import { Router } from '@/router';
 import type { mimeTypes } from './lib/consts';
 import { Logger } from './lib/logger';
 import { cors } from './lib/options';
+import { RouteLoader } from './lib/route-loader';
 
 interface CorsOptions {
   enabled: boolean;
@@ -40,13 +41,21 @@ export class Server {
 
   constructor(port: number, options?: Options) {
     this.logger = new Logger();
-    this.options = options;
+    this.options = options!;
     this.init(port, options);
   }
 
-  init(port: number, options: Options = {}) {
-    this.router = new Router();
+  async init(port: number, options: Options = {}) {
+    const routeLoader = await new RouteLoader().init()
+    const routes = routeLoader.getRoutes()
+    this.router = new Router(routes);
 
+    this.createServer(options)
+
+    this.httpServer.listen(port);
+  }
+
+  createServer(options: Options) {
     this.httpServer = http.createServer(
       options,
       async (req: RequestWithPrototype, res: ResponseWithPrototype) => {
@@ -73,7 +82,6 @@ export class Server {
       }
     );
 
-    this.httpServer.listen(port);
   }
 
   injectMethodsAndProperties(

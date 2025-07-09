@@ -9,8 +9,10 @@ export const pad = (n: number) => {
 export const transformPathIntoSegments = (rawPath: string) =>
 
   rawPath.split(path.sep).map((segment) => {
-    if (segment.includes('[') && segment.includes(']')) {
+    if (segment.includes('[') && segment.includes(']') && !segment.includes("...")) {
       return segment.replace('[', ':').replace(']', '');
+    } else if (segment.includes("...")) {
+      return segment.replace('[', '').replace(']', '')
     }
     return segment;
   });
@@ -33,6 +35,11 @@ export const joinSegments = (segments: string[]) => segments.map((segment) => {
     let newSegment = segment.replace(":", "[")
     let st = newSegment.split('')
     st.push(']')
+    return st.join("")
+  } else if (segment.includes('...')) {
+    let st = segment.split("")
+    st.push(']')
+    st.unshift('[')
     return st.join("")
   }
   return segment
