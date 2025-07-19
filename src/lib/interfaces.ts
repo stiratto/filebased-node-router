@@ -1,3 +1,4 @@
+import { mimeTypes } from "./consts";
 import { RequestWithPrototype } from "./request";
 import { ResponseWithPrototype } from "./response";
 
@@ -9,4 +10,26 @@ export interface Route {
 
 export interface Controller {
   handler: (req?: RequestWithPrototype, res?: ResponseWithPrototype) => any;
+}
+
+export interface MiddlewareProps {
+  name: string;
+  isGlobal: boolean;
+  isRouteLocal: boolean;
+  handler: ((req, res, next) => void) | null;
+}
+
+export interface CorsOptions {
+  enabled: boolean;
+  origin?: string;
+  credentials?: boolean;
+  age?: number;
+  methods?: string[];
+  headers?: string[];
+  expose?: string[];
+}
+
+export interface ExtraOptions {
+  cors?: CorsOptions;
+  parsers?: (keyof typeof mimeTypes)[];
 }

@@ -9,76 +9,75 @@ import resProto, {
   type ResponseWithPrototype,
 } from '@/lib/response';
 import { Router } from '@/router';
-import type { mimeTypes } from './lib/consts';
 import { Logger } from './lib/logger';
 import { cors } from './lib/options';
 import { RouteLoader } from './lib/route-loader';
+import { MiddlewareLoader } from './lib/middleware-loader';
+import { Options } from './lib/types';
+import { RouteTrieNode } from './lib/trie';
+import { MiddlewareProps } from './lib/interfaces';
 
-interface CorsOptions {
-  enabled: boolean;
-  origin?: string;
-  credentials?: boolean;
-  age?: number;
-  methods?: string[];
-  headers?: string[];
-  expose?: string[];
-}
-
-interface ExtraOptions {
-  cors?: CorsOptions;
-  parsers?: (keyof typeof mimeTypes)[];
-}
-type Options = http.ServerOptions & ExtraOptions;
 
 export class Server {
   private httpServer: http.Server<
     typeof http.IncomingMessage & Request,
     typeof http.ServerResponse & Response
   >;
+
   private router: Router;
-  private options: Options;
   private logger: Logger;
+  private middlewares;
 
-  constructor(port: number, options?: Options) {
+  constructor(private port: number, private options: Options = {}) {
     this.logger = new Logger();
-    this.options = options!;
-    this.init(port, options);
   }
 
-  async init(port: number, options: Options = {}) {
-    const routeLoader = await new RouteLoader().init()
-    const routes = routeLoader.getRoutes()
-    this.router = new Router(routes);
+  async start() {
+    this.middlewares = []
 
-    this.createServer(options)
+    const routes = await this.loadRoutes()
 
-    this.httpServer.listen(port);
+    this.middlewares = await this.loadMiddlewares(routes)
+
+    this.router = new Router(routes, this.middlewares);
+
+    this.httpServer = this.createServer()
+
+    this.httpServer.listen(this.port, () => {
+      console.log(`Listening on port ${this.port}`)
+    });
   }
 
-  createServer(options: Options) {
-    this.httpServer = http.createServer(
-      options,
+  async loadRoutes() {
+    const loader = await new RouteLoader().init()
+    return loader.getRoutes()
+  }
+
+  async loadMiddlewares(routes: RouteTrieNode) {
+    const loader = new MiddlewareLoader(routes)
+    const middlewares = await loader.readGlobalMiddlewares()
+
+    return middlewares
+  }
+
+  createServer() {
+    return http.createServer(
+      this.options,
       async (req: RequestWithPrototype, res: ResponseWithPrototype) => {
         this.logger.info(`[${req.method}] ${req.url}`);
-
         // inject extra methods and properties
         this.injectMethodsAndProperties(req, res);
-
-        // parse the body if it's post method
-        if (req.method === 'POST') {
-          req.body = null;
-          const parser = new Parser(req, res, this.options.parsers as string[]);
-          await parser.init(req, res);
-        }
 
         req.params = null
         req.query = null
 
-        if (options) {
+        if (this.options) {
           this.decideOptions(res as ResponseWithPrototype, req);
         }
 
-        this.router.handleRequest(req, res as ResponseWithPrototype);
+        console.log(req.url)
+        // execs middlewares before doing handleRequest()
+        await this.runMiddlewares(this.middlewares, req, res)
       }
     );
 
@@ -91,6 +90,34 @@ export class Server {
     Object.setPrototypeOf(req, reqProto);
     Object.setPrototypeOf(res, resProto);
   }
+
+  async runMiddlewares(middlewares: MiddlewareProps[], req: RequestWithPrototype, res: ResponseWithPrototype) {
+    const finalHandler = () => this.router.handleRequest(req, res)
+    // so when we do index++ in next(), we start with first one
+    let index = -1;
+
+    // function that will be run by middlewares to continue with
+    // request
+    const next = async () => {
+      index++
+
+      if (index < middlewares.length) {
+        // exec middleware handler, middlewares will execute the next
+        // func passed to them
+        middlewares[index].handler?.(req, res, next)
+      } else {
+        // if every middleware was ran succesfully, execute the
+        // finalHAndler which should be router.handleRequest() for the
+        // request to get to the corresponding controllers
+        await finalHandler()
+      }
+    }
+
+    // on first execute, execute the first middleware
+    next()
+
+  }
+
 
   decideOptions(res: ResponseWithPrototype, req: RequestWithPrototype) {
     const opts = this.options;

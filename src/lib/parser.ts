@@ -8,32 +8,30 @@ export class Parser {
   contentType: ContentTypes;
   data: Buffer;
   body: any;
-  parsers: string[];
 
   constructor(
     req: RequestWithPrototype,
     res: ResponseWithPrototype,
-    parsers: string[]
+    private parsers: string[]
   ) {
-    this.parsers = parsers;
   }
 
   async init(
     req: RequestWithPrototype,
     res: ResponseWithPrototype
   ): Promise<any> {
-    // if method is not post, return
-    if (!(req.method === 'POST')) return;
 
     // extract headers and put them on this.
-
     const contentType = req.headers['content-type'];
+
+    if (!contentType) {
+      res.send('Unsupported Content Type', 415)
+    }
     // extract only the header (not boundary or encoding=utf)
     const [baseType] = contentType.split(';').map((s) => s.trim());
     this.contentType = baseType as ContentTypes;
 
     // so we dont get undefined on some cases of this.body
-
     if (
       this.contentType.includes('text/') ||
       this.contentType.includes('json') ||
@@ -53,6 +51,7 @@ export class Parser {
     req: RequestWithPrototype,
     res: ResponseWithPrototype
   ): Promise<any> {
+
     // decide if the content-type from the request is supported in
     // the server
     this.isParserEnabled();
@@ -89,10 +88,10 @@ export class Parser {
 
         // multipart case
       } else if (this.contentType === 'multipart/form-data') {
-        return this.parseMultipart(req, res);
+        resolve(this.parseMultipart(req, res))
         // url encoded case
       } else if (this.contentType === 'application/x-www-form-urlencoded') {
-        return this.parseEncodedUrl();
+        resolve(this.parseEncodedUrl())
       }
     });
   }
@@ -118,48 +117,53 @@ export class Parser {
     req: RequestWithPrototype,
     res: ResponseWithPrototype
   ) {
-    req.body = {};
-    const bb = busboy({ headers: req.headers });
+    try {
+      req.body = {};
+      const bb = busboy({ headers: req.headers });
 
-    bb.on('file', (name, file, info) => {
-      const { filename, encoding, mimeType } = info;
-      let totalBytes = 0;
-      const MAX_SIZE = 3 * 1024 * 1024;
+      bb.on('file', (name, file, info) => {
+        const { filename, encoding, mimeType } = info;
+        let totalBytes = 0;
+        const MAX_SIZE = 3 * 1024 * 1024;
 
-      let image = Buffer.alloc(MAX_SIZE);
+        let image = Buffer.alloc(MAX_SIZE);
 
-      file
-        .on('data', (data) => {
-          // max size
-          totalBytes += data.length;
-          if (totalBytes > MAX_SIZE) {
-            throw new Error(
-              `File is too big, max is ${MAX_SIZE / (1024 * 1024)}MB`
-            );
-          }
-          image = Buffer.concat([image, data]);
-        })
-        .on('close', () => {
-          req.body[filename] = {
-            buffer: image,
-            filename,
-            encoding,
-            mimeType,
-          };
-          console.log(req.body[filename]);
-        });
-    });
+        file
+          .on('data', (data) => {
+            // max size                                                 
+            totalBytes += data.length;
+            if (totalBytes > MAX_SIZE) {
+              throw new Error(
+                `File is too big, max is ${MAX_SIZE / (1024 * 1024)}MB`
+              );
+            }
+            image = Buffer.concat([image, data]);
+          })
+          .on('close', () => {
+            req.body[filename] = {
+              buffer: image,
+              filename,
+              encoding,
+              mimeType,
+            };
+          });
+      });
 
-    bb.on('field', (name, val, info) => {
-      req.body[name] = val;
-    });
+      bb.on('field', (name, val, info) => {
+        req.body[name] = val;
+      });
 
-    bb.on('close', () => {
-      res.writeHead(303, { Connection: 'close', Location: '/' });
-      res.end();
-    });
+      bb.on('close', () => {
+        res.end();
+      });
 
-    req.pipe(bb);
+      req.pipe(bb);
+
+
+    } catch (err) {
+      throw err
+    }
+
   }
 
   /**

@@ -153,9 +153,40 @@ Por hacer:
 
 
 
+---
+
+
+# Middlewares
+Llega la request. Las rutas ya estan registradas.
+Antes de que la request llegue a un controlador de una ruta,
+ejecutamos los middlewares. Donde estan esos middlewares?
 
 
 
+
+- Se ejecutan antes de que la request llegue a los controladores
+- Se ejecutan en una ruta especifica o globalmente
+- Se ejecutan en orden, es decir, si middleware1 se registro antes de
+  middleware2, middleware2 no se puede ejecutar antes de middleware1.
+- Se pueden ejecutar ya sea globalmente, por grupo de ruta (/admin >
+/admin/profile, /admin/route/route1) o por ruta individual.
+
+
+Primero, leamos middlewares solo en la carpeta src/middlewares/.
+Los middlewares en src/middlewares son los que se ejecutaran
+globalmente.
+
+
+
+funcion next()
+
+La funcion next() hace que un middleware continue con el proceso de la
+request. 
+Si un middleware no llama a next() en su main(), la respuesta no
+continuara
+La llamada a next() ejecuta el middleware siguiente al actual.
+
+Como podemos implementar next()?
 
 
 

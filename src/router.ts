@@ -1,3 +1,4 @@
+import { warn } from 'console';
 import { Logger } from './lib/logger';
 import type { RequestWithPrototype } from './lib/request';
 import type { ResponseWithPrototype } from './lib/response';
@@ -6,16 +7,20 @@ import { RouteTrieNode } from './lib/trie';
 export class Router {
 	private routes: RouteTrieNode;
 	private logger: Logger;
+	private middlewares;
 
-	constructor(routes: RouteTrieNode) {
+	constructor(routes: RouteTrieNode, middlewares) {
 		this.logger = new Logger();
 		this.routes = new RouteTrieNode();
 		this.routes = routes
+		this.middlewares = middlewares
+
 
 		this.logger.info("Routes loaded succesfully.")
-		console.log(JSON.stringify(this.serializeTrieNode(this.routes), null, 2));
+		// console.log(JSON.stringify(this.serializeTrieNode(this.routes), null, 2));
 
 	}
+
 
 	// executes when a request gets to the http.createServer in Server
 	// class
@@ -25,7 +30,10 @@ export class Router {
 		// finds the correct route
 		const route = this.routeExists(segments);
 
+
 		if (route) {
+			let index = 0;
+
 			const { correspondingRoute, data: reqData } = route
 
 			const controller = correspondingRoute.controllers.get(req.method as string)
@@ -40,11 +48,10 @@ export class Router {
 
 			this.logger.log(`[${status}] ${req.url}`)
 			res.send(data, status)
-
 		} else {
-			this.logger.log(`[404] ${req.url}`)
-			res.writeHead(404, { 'Content-Type': 'text/plain' });
-			res.end('Not Found');
+			this.logger.error(`[404] ${req.url}`)
+			// res.writeHead(404, { 'Content-Type': 'text/plain' });
+			res.send('Not Found', 404);
 		}
 	}
 
@@ -53,6 +60,7 @@ export class Router {
 			let curr = this.routes;
 			let data = {}
 			let matched = false
+
 			// loop en los segments de req.url
 			for (const [index, segment] of segments.entries()) {
 
@@ -61,6 +69,7 @@ export class Router {
 
 					// setea curr a ese hijo
 					curr = curr.children.get(segment)!
+					matched = true
 
 					// si no hay ruta estatica, buscar dinamica o catchall si no
 					// hay dinamica
@@ -87,7 +96,9 @@ export class Router {
 
 			}
 
-			if (!matched) return null
+			if (!matched)
+				return null
+
 
 			return {
 				correspondingRoute: curr,
@@ -115,7 +126,5 @@ export class Router {
 			nestedRoutes: json,
 		};
 	}
-
-
 
 }

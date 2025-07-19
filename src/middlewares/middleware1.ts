@@ -1,9 +1,11 @@
 import type { RequestWithPrototype } from '@/lib/request';
-import type { ResponseWithPrototype } from '@/lib/response';
+import { ResponseWithPrototype } from '@/lib/response';
 
-const main = (req: RequestWithPrototype, res: ResponseWithPrototype) => {
-  req.testField = '';
-  return { req, res };
+export const props = { prop1: 'asd', prop2: 'asd2' }
+
+const main = (req: RequestWithPrototype, res: ResponseWithPrototype, next) => {
+  console.log('m1')
+  next()
 };
 
 export { main };
