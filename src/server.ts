@@ -27,6 +27,7 @@ export class Server {
   private router: Router;
   private logger: Logger;
   private middlewares;
+  private middlewareLoader: MiddlewareLoader;
 
   constructor(private port: number, private options: Options = {}) {
     this.logger = new Logger();
@@ -36,11 +37,9 @@ export class Server {
     this.middlewares = []
 
     const routes = await this.loadRoutes()
+    this.router = new Router(routes);
 
-    this.middlewares = await this.loadMiddlewares(routes)
-
-    this.router = new Router(routes, this.middlewares);
-
+    this.middlewares = await this.loadMiddlewares()
     this.httpServer = this.createServer()
 
     this.httpServer.listen(this.port, () => {
@@ -53,9 +52,10 @@ export class Server {
     return loader.getRoutes()
   }
 
-  async loadMiddlewares(routes: RouteTrieNode) {
-    const loader = new MiddlewareLoader(routes)
-    const middlewares = await loader.readGlobalMiddlewares()
+  async loadMiddlewares() {
+    const loader = new MiddlewareLoader(this.router)
+    const middlewares = await loader.readMiddlewares()
+    this.middlewareLoader = loader
 
     return middlewares
   }
@@ -75,9 +75,10 @@ export class Server {
           this.decideOptions(res as ResponseWithPrototype, req);
         }
 
-        console.log(req.url)
         // execs middlewares before doing handleRequest()
-        await this.runMiddlewares(this.middlewares, req, res)
+
+        await this.middlewareLoader.findCorrespondingMiddleware(req.url)
+        // await this.runMiddlewares(this.middlewares, req, res)
       }
     );
 

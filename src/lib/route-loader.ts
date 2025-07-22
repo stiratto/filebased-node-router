@@ -1,7 +1,7 @@
 import { RouteTrieNode } from "./trie";
-import fs from "fs"
+import fs from "fs/promises"
 import path from "path"
-import { fileIsController, joinSegments, transformPathIntoSegments } from "./utils";
+import { fileIsController, getControllerFilesForRoute, getRoutesInsideDirectory, joinSegments, transformPathIntoSegments } from "./utils";
 import { Logger } from "./logger";
 import { Controller } from "./interfaces";
 import { pathToFileURL } from "url";
@@ -52,7 +52,13 @@ export class RouteLoader {
 			}
 
 
-			const currentFolderFiles = await this.getRoutesInsideDirectory(rootFolder)
+			let currentFolderFiles;
+			try {
+				currentFolderFiles = await getRoutesInsideDirectory(rootFolder)
+			} catch (err) {
+				throw new Error(err)
+			}
+
 
 			// base case
 			if (currentFolderFiles.length <= 0) {
@@ -61,11 +67,18 @@ export class RouteLoader {
 
 
 			for (const folder of currentFolderFiles) {
+				if (folder === "middlewares") continue
 				// only if it's a directory we explore it (if its a route, not
 				// a normal file like a controller)
 				const pathOfThisFolder = path.resolve(rootFolder, folder);
 
-				const controllers = await fs.promises.readdir(pathOfThisFolder);
+				let controllers: string[] = [];
+				try {
+					controllers = await fs.readdir(pathOfThisFolder);
+				} catch (err) {
+					this.logger.error(err)
+
+				}
 				// if route doesn't has controllers, mark that route in the
 				// TrieNode as hasControllers = false
 				let hasControllers = false;
@@ -73,7 +86,7 @@ export class RouteLoader {
 				// check if route has controllers
 				for (const controller of controllers) {
 					const controllerPath = path.resolve(pathOfThisFolder, controller);
-					const isController = fileIsController(controllerPath);
+					const isController = await fileIsController(controllerPath);
 
 					if (isController) {
 						hasControllers = true;
@@ -151,7 +164,6 @@ export class RouteLoader {
 				}
 			});
 
-			console.log(curr)
 			this.readControllers(segments, curr)
 		} catch (err: any) {
 			this.logger.error(err);
@@ -159,67 +171,46 @@ export class RouteLoader {
 		}
 	}
 
-	private async getRoutesInsideDirectory(folderPath: string) {
-		let files = fs.readdirSync(folderPath).map((file) => {
-			const currFilePath = path.join(folderPath, path.sep, file)
-			const currFileStats = fs.statSync(currFilePath)
 
-			if (!currFileStats.isDirectory()) {
-				return ''
-			}
-
-			return file
-		})
-
-		return files.filter((file) => file !== '')
-	}
 
 	// returns an array of controller names in the current route
-	private async getControllerFilesForRoute(segments: string[]) {
-		const absoluteRoutePath = path.resolve("src/routes", ...segments)
-
-		let files = fs.readdirSync(absoluteRoutePath).map((file) => {
-			const currFilePath = path.join(absoluteRoutePath, path.sep, file)
-			const currFileStats = fs.statSync(currFilePath)
-
-			if (currFileStats.isDirectory()) {
-				return ''
-			}
-
-			return file
-		})
-
-		return files.filter((file) => file !== '')
-	}
 
 	private isValidHttpMethodFile(file: string) {
+		try {
+			// get only the file name, without the extension                                          
+			const indexOfLastDot = file.lastIndexOf('.');
 
-		// get only the file name, without the extension                                         
-		const indexOfLastDot = file.lastIndexOf('.');
+			const method = file
+				.slice(0, indexOfLastDot)
+				.toUpperCase() as (typeof Method)[number];
 
-		const method = file
-			.slice(0, indexOfLastDot)
-			.toUpperCase() as (typeof Method)[number];
+			// file name must be a method name                                                        
+			if (!Method.includes(method)) {
+				return false
+			}
 
-		// file name must be a method name                                                       
-		if (!Method.includes(method)) {
-			return false
+			return true
+		} catch (err) {
+			throw err
 		}
-
-		return true
 
 	}
 
 	private parseHttpMethod(fileName: string) {
+		try {
+			// get only the file name, without the extension                                          
+			const indexOfLastDot = fileName.lastIndexOf('.');
 
-		// get only the file name, without the extension                                         
-		const indexOfLastDot = fileName.lastIndexOf('.');
+			const method = fileName
+				.slice(0, indexOfLastDot)
+				.toUpperCase() as (typeof Method)[number];
 
-		const method = fileName
-			.slice(0, indexOfLastDot)
-			.toUpperCase() as (typeof Method)[number];
+			return method
 
-		return method
+
+		} catch (err: any) {
+			throw err
+		}
 	}
 
 	/** 
@@ -247,7 +238,7 @@ export class RouteLoader {
 
 			// we can have folders inside folders, so check if file is not a                           
 			// folder                                                                                  
-			let files = await this.getControllerFilesForRoute(joinedSegments)
+			let files = await getControllerFilesForRoute(joinedSegments)
 			for (const file of files) {
 
 				if (!this.isValidHttpMethodFile(file)) {

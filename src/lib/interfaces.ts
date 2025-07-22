@@ -14,6 +14,7 @@ export interface Controller {
 
 export interface MiddlewareProps {
   name: string;
+  appliesTo: string;
   isGlobal: boolean;
   isRouteLocal: boolean;
   handler: ((req, res, next) => void) | null;

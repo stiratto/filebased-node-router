@@ -7,17 +7,15 @@ import { RouteTrieNode } from './lib/trie';
 export class Router {
 	private routes: RouteTrieNode;
 	private logger: Logger;
-	private middlewares;
 
-	constructor(routes: RouteTrieNode, middlewares) {
+	constructor(routes: RouteTrieNode) {
 		this.logger = new Logger();
 		this.routes = new RouteTrieNode();
 		this.routes = routes
-		this.middlewares = middlewares
 
 
 		this.logger.info("Routes loaded succesfully.")
-		// console.log(JSON.stringify(this.serializeTrieNode(this.routes), null, 2));
+		console.log(JSON.stringify(this.serializeTrieNode(this.routes), null, 2));
 
 	}
 
