@@ -142,11 +142,9 @@ export class Router {
 			// loop en los segments de req.url
 			for (const [index, segment] of segments.entries()) {
 
-				console.log(curr.segment === segment)
 				// si segment existe en las nested routes del nodo actual
 
 				if (curr.children.has(segment)) {
-					console.log("Pene")
 
 					// setea curr a ese hijo
 					curr = curr.children.get(segment)!
@@ -182,7 +180,6 @@ export class Router {
 
 
 
-			console.log('asd', curr)
 			return {
 				correspondingRoute: curr,
 				data

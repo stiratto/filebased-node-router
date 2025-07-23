@@ -150,7 +150,6 @@ export class MiddlewareLoader {
 			middleware.handler = main;
 
 			props = ValidationMiddlewareOptions.parse(props)
-			console.log(props)
 
 
 			this.registerMiddlewareOnExistingRoute(middleware, props)
@@ -165,7 +164,6 @@ export class MiddlewareLoader {
 		try {
 			this.logger.error(`Registering middleware ${middleware.name}`)
 			const segments = transformPathIntoSegments(middleware.appliesTo)
-			console.log(segments)
 			const route = this.router.routeExists(segments)
 
 			if (!route?.correspondingRoute) {
