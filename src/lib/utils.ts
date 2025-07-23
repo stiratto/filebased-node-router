@@ -1,10 +1,25 @@
 import fs from 'fs/promises';
 import path from 'path';
 import { Method } from './consts';
+import { MiddlewareOptions } from './types';
 
 export const pad = (n: number) => {
   return n < 10 ? '0' + n : n.toString();
 };
+
+export function defineProps(props: Partial<MiddlewareOptions>): MiddlewareOptions {
+  const opts: MiddlewareOptions = {
+    bubble: false,
+    registerBefore: ""
+  }
+  if (props.bubble)
+    opts.bubble = props.bubble
+
+  if (props.registerBefore)
+    opts.registerBefore = props.registerBefore
+
+  return opts
+}
 
 export const getRoutesInsideDirectory = async (folderPath: string) => {
   try {
@@ -53,14 +68,17 @@ export const getControllerFilesForRoute = async (segments: string[]) => {
 
 
 export const transformPathIntoSegments = (rawPath: string) =>
-  rawPath.split(path.sep).map((segment) => {
-    if (segment.includes('[') && segment.includes(']') && !segment.includes("...")) {
-      return segment.replace('[', ':').replace(']', '');
-    } else if (segment.includes("...")) {
-      return segment.replace('[', '').replace(']', '')
-    }
-    return segment;
-  });
+  rawPath
+    .split(path.sep)
+    .filter(Boolean) // <- esto descarta strings vacíos como ''
+    .map((segment) => {
+      if (segment.includes('[') && segment.includes(']') && !segment.includes("...")) {
+        return segment.replace('[', ':').replace(']', '');
+      } else if (segment.includes("...")) {
+        return segment.replace('[', '').replace(']', '');
+      }
+      return segment;
+    });
 
 export const fileIsController = async (filePath: string) => {
   try {

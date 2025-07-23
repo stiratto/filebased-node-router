@@ -1,23 +1,22 @@
 import path, { normalize } from "path";
-import { RouteTrieNode } from "./trie";
 import fs from "fs/promises";
 import { pathToFileURL } from "url";
 import { Logger } from "./logger";
-import { MiddlewareProps } from "./interfaces";
+import { MiddlewareModule, MiddlewareProps } from "./interfaces";
 import { getRoutesInsideDirectory, transformPathIntoSegments } from "./utils";
 import { Router } from "@/router";
+import { ValidationMiddlewareOptions } from "./consts";
+import { MiddlewareOptions } from "./types";
 
 // global middlewares on src/middlewares
 // route middlewares on folder middlewares inside routes
 
 
 export class MiddlewareLoader {
-	private middlewares: Array<MiddlewareProps>;
 	private logger: Logger;
 
 	constructor(private router: Router) {
 		this.logger = new Logger()
-		this.middlewares = []
 	}
 
 	// read middlewares on route src/middlewares
@@ -26,39 +25,13 @@ export class MiddlewareLoader {
 		await this.readGlobalMiddlewares()
 		// locales
 		await this.readLocalMiddlewares()
-		console.log(this.middlewares)
-		return this.middlewares;
+		this.router.logRoutes()
 	}
 
 
 	// tenemos que encontrar el middleware y revisar si ese middleware
 	// aplica para la request actual
 	//
-	async findCorrespondingMiddleware(url) {
-
-		const normalized = path.normalize(url)
-		const separatedPath = normalized.split(path.sep).filter(v => v !== '')
-		console.log(separatedPath)
-		const routeExists = this.router.routeExists(separatedPath)
-		if (!routeExists) {
-			this.logger.error("No middleware for that route")
-			return
-		}
-
-		const { correspondingRoute: route } = routeExists
-		console.log(route)
-
-		let normalizedUrl = path.normalize(url)
-		if (normalizedUrl.indexOf(path.sep) === 0 || normalizedUrl.indexOf(path.sep) === normalizedUrl.length - 1) {
-			normalizedUrl = normalizedUrl.replace(path.sep, "")
-		}
-		const correspondingMiddleware = this.middlewares.find(middleware => middleware.appliesTo === normalizedUrl)
-
-		if (!correspondingMiddleware) {
-			this.logger.error("No middleware for that")
-		}
-
-	}
 
 	async readGlobalMiddlewares() {
 		const rootPath = path.join("src", "middlewares")
@@ -98,7 +71,9 @@ export class MiddlewareLoader {
 					this.logger.log(`Found middlewares/ folder in path ${filePath}`)
 					const middlewares = await fs.readdir(filePath);
 					for (const middleware of middlewares) {
+
 						await this.readMiddleware(path.join(filePath, middleware))
+
 					}
 				}
 
@@ -107,10 +82,9 @@ export class MiddlewareLoader {
 				}
 			}
 
-			return this.middlewares
 
 		} catch (err) {
-			throw new Error("Error reading local middlewares")
+			throw err
 		}
 	}
 
@@ -125,26 +99,21 @@ export class MiddlewareLoader {
 			const middlewareFilename = path.basename(middlewarePath).split('.')[0]
 
 			const middleware: MiddlewareProps = {
+				bubble: false,
 				appliesTo: "",
 				name: middlewareFilename,
-				isGlobal: false,
-				isRouteLocal: false,
 				handler: null
 			}
 
 
 			// middlewar is in middlewares src folder, is global
 			if (middlewarePath.includes(`src${path.sep}middlewares`)) {
-				middleware.isGlobal = true
-				middleware.appliesTo = "/"
+				middleware.appliesTo = ""
 				// is local
 			} else {
-				middleware.isGlobal = false
-				middleware.isRouteLocal = true
 				// get the path of middleware based in folders
 				const normalizedPath = path.normalize(middlewarePath)
 				const separatedPath = normalizedPath.split(path.sep)
-				console.log(separatedPath)
 				const routesIndex = separatedPath.indexOf("routes")
 
 				// gets the route, skips everything before the first segment
@@ -155,40 +124,86 @@ export class MiddlewareLoader {
 				const subRouteParts = separatedPath.slice(routesIndex + 1, separatedPath.indexOf("middlewares"))
 
 				const routePath = path.join(...subRouteParts)
-				middleware.appliesTo = routePath
+
+
+				middleware.appliesTo = transformPathIntoSegments(routePath).join(path.sep)
 			}
 
-			const { props, main } = await import(pathToFileURL(middlewarePath).href)
+
+			// Every middleware should export a main() function and
+			// optionally a props, but props shouldn't have a random option.
+			//
+			// Let's validate:
+			// - middleware exports a main() function with the signature:
+			// (req, res, next) => void
+			// - middleware exports optionally a props variable with the
+			// signature MiddlewareOptions
+
+			const mod = await import(pathToFileURL(middlewarePath).href) as MiddlewareModule;
+
+			let { props, main } = mod
+
+			if (typeof main !== 'function') {
+				throw new Error("A middleware must export a main() function")
+			}
 
 			middleware.handler = main;
 
-			if (props) {
-				// register middleware before another
-				if (props?.registerBefore?.length > 1) {
+			props = ValidationMiddlewareOptions.parse(props)
+			console.log(props)
 
-					const m = this.middlewares.find(m => m.name === props.registerBefore)
-					if (!m) {
-						throw new Error(`Couldn't register middleware ${middleware.name} before ${props.registerBefore} because it doesn't exists.`)
-					}
 
-					const index = this.middlewares.indexOf(m)
-
-					this.middlewares.splice(index, 0, middleware)
-					// register first
-				} else if (props.registerBefore === "*") {
-					this.middlewares.unshift(middleware)
-					// else, at the end
-				} else {
-					this.middlewares.push(middleware)
-				}
-			} else {
-				this.middlewares.push(middleware)
-			}
-
+			this.registerMiddlewareOnExistingRoute(middleware, props)
 		} catch (err: any) {
 			throw err
 		}
 	}
 
+
+
+	async registerMiddlewareOnExistingRoute(middleware: MiddlewareProps, props: MiddlewareOptions) {
+		try {
+			this.logger.error(`Registering middleware ${middleware.name}`)
+			const segments = transformPathIntoSegments(middleware.appliesTo)
+			console.log(segments)
+			const route = this.router.routeExists(segments)
+
+			if (!route?.correspondingRoute) {
+				throw new Error("No route exists for that middleware")
+			}
+
+			if (!props) {
+				route.correspondingRoute.middlewares.push(middleware)
+				return
+			}
+
+			// handles bubble prop
+			if (props.bubble)
+				middleware.bubble = props.bubble
+
+			// handles register before prop
+			if (props?.registerBefore?.length > 1) {
+
+				const m = route.correspondingRoute.middlewares.find(m => m.name === props.registerBefore)
+
+				if (!m) {
+					throw new Error(`Couldn't register middleware ${middleware.name} before ${props.registerBefore} because it doesn't exists.`)
+				}
+
+				const index = route.correspondingRoute.middlewares.indexOf(m)
+
+				// register this middleware before the registerBefore middleware                                                               
+				route.correspondingRoute.middlewares.splice(index, 0, middleware)
+
+			} else if (props?.registerBefore?.length > 1 && props.registerBefore === "*") {
+				route.correspondingRoute.middlewares.unshift(middleware)
+			} else {
+				route.correspondingRoute.middlewares.push(middleware);
+			}
+
+		} catch (err) {
+			throw err
+		}
+	}
 
 }

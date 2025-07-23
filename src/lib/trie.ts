@@ -1,4 +1,4 @@
-import { Controller } from "./interfaces";
+import { Controller, MiddlewareProps } from "./interfaces";
 
 export class RouteTrieNode {
 	children: Map<string, RouteTrieNode>;
@@ -7,6 +7,7 @@ export class RouteTrieNode {
 	hasControllers: boolean;
 	controllers: Map<string, Controller>;
 	isCatchAll: boolean;
+	middlewares: MiddlewareProps[]
 
 	constructor() {
 		this.children = new Map();
@@ -15,6 +16,7 @@ export class RouteTrieNode {
 		this.hasControllers = false;
 		this.controllers = new Map();
 		this.isCatchAll = false;
+		this.middlewares = []
 	}
 
 }

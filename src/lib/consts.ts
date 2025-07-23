@@ -1,3 +1,5 @@
+import z from "zod";
+
 export const mimeTypes = {
   json: 'application/json',
   multipart: 'multipart/form-data',
@@ -12,3 +14,8 @@ export const Method = [
   'PATCH',
   'WEBSOCKET',
 ] as const;
+
+export const ValidationMiddlewareOptions = z.object({
+  bubble: z.boolean().default(false),
+  registerBefore: z.string().default("")
+})

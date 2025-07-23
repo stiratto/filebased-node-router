@@ -1,6 +1,8 @@
-import { mimeTypes } from "./consts";
+import z from "zod";
+import { mimeTypes, ValidationMiddlewareOptions } from "./consts";
 import { RequestWithPrototype } from "./request";
 import { ResponseWithPrototype } from "./response";
+import { MiddlewareOptions } from "./types";
 
 export interface Route {
   path: string;
@@ -15,9 +17,13 @@ export interface Controller {
 export interface MiddlewareProps {
   name: string;
   appliesTo: string;
-  isGlobal: boolean;
-  isRouteLocal: boolean;
+  bubble: boolean;
   handler: ((req, res, next) => void) | null;
+}
+
+export interface MiddlewareModule {
+  props: MiddlewareOptions,
+  main: MiddlewareProps['handler']
 }
 
 export interface CorsOptions {

@@ -1,5 +1,4 @@
 import http from 'node:http';
-import { Parser } from '@/lib/parser';
 import reqProto, {
   type Request,
   type RequestWithPrototype,
@@ -14,8 +13,6 @@ import { cors } from './lib/options';
 import { RouteLoader } from './lib/route-loader';
 import { MiddlewareLoader } from './lib/middleware-loader';
 import { Options } from './lib/types';
-import { RouteTrieNode } from './lib/trie';
-import { MiddlewareProps } from './lib/interfaces';
 
 
 export class Server {
@@ -26,20 +23,17 @@ export class Server {
 
   private router: Router;
   private logger: Logger;
-  private middlewares;
-  private middlewareLoader: MiddlewareLoader;
-
   constructor(private port: number, private options: Options = {}) {
     this.logger = new Logger();
   }
 
   async start() {
-    this.middlewares = []
 
     const routes = await this.loadRoutes()
     this.router = new Router(routes);
 
-    this.middlewares = await this.loadMiddlewares()
+    await this.loadMiddlewares()
+
     this.httpServer = this.createServer()
 
     this.httpServer.listen(this.port, () => {
@@ -55,7 +49,6 @@ export class Server {
   async loadMiddlewares() {
     const loader = new MiddlewareLoader(this.router)
     const middlewares = await loader.readMiddlewares()
-    this.middlewareLoader = loader
 
     return middlewares
   }
@@ -77,7 +70,7 @@ export class Server {
 
         // execs middlewares before doing handleRequest()
 
-        await this.middlewareLoader.findCorrespondingMiddleware(req.url)
+        await this.router.handleRequest(req, res)
         // await this.runMiddlewares(this.middlewares, req, res)
       }
     );
@@ -90,33 +83,6 @@ export class Server {
   ) {
     Object.setPrototypeOf(req, reqProto);
     Object.setPrototypeOf(res, resProto);
-  }
-
-  async runMiddlewares(middlewares: MiddlewareProps[], req: RequestWithPrototype, res: ResponseWithPrototype) {
-    const finalHandler = () => this.router.handleRequest(req, res)
-    // so when we do index++ in next(), we start with first one
-    let index = -1;
-
-    // function that will be run by middlewares to continue with
-    // request
-    const next = async () => {
-      index++
-
-      if (index < middlewares.length) {
-        // exec middleware handler, middlewares will execute the next
-        // func passed to them
-        middlewares[index].handler?.(req, res, next)
-      } else {
-        // if every middleware was ran succesfully, execute the
-        // finalHAndler which should be router.handleRequest() for the
-        // request to get to the corresponding controllers
-        await finalHandler()
-      }
-    }
-
-    // on first execute, execute the first middleware
-    next()
-
   }
 
 

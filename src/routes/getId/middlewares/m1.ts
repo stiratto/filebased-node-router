@@ -3,12 +3,12 @@ import { defineProps } from "@/lib/utils"
 
 export const props = defineProps({
 	bubble: true,
-	registerBefore: "m1"
 })
 
 export const main = (req: RequestWithPrototype, res, next) => {
 	console.log(req.body)
-	console.log('middleware on getId/middlewares')
+	console.log('middleware1 on getId/middlewares')
 	next()
 }
+
 

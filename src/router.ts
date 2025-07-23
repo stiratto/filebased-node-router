@@ -1,8 +1,10 @@
-import { warn } from 'console';
+import path from 'path';
+import { MiddlewareProps } from './lib/interfaces';
 import { Logger } from './lib/logger';
 import type { RequestWithPrototype } from './lib/request';
 import type { ResponseWithPrototype } from './lib/response';
 import { RouteTrieNode } from './lib/trie';
+import { transformPathIntoSegments } from './lib/utils';
 
 export class Router {
 	private routes: RouteTrieNode;
@@ -13,10 +15,15 @@ export class Router {
 		this.routes = new RouteTrieNode();
 		this.routes = routes
 
-
 		this.logger.info("Routes loaded succesfully.")
-		console.log(JSON.stringify(this.serializeTrieNode(this.routes), null, 2));
 
+	}
+
+	async logRoutes() {
+		console.log(JSON.stringify(this.serializeTrieNode(this.routes), (_, value) => {
+			if (typeof value === 'function') return '[Function]';
+			return value;
+		}, 2));
 	}
 
 
@@ -28,9 +35,10 @@ export class Router {
 		// finds the correct route
 		const route = this.routeExists(segments);
 
-
 		if (route) {
-			let index = 0;
+			const middlewares = this.collectMiddlewares(req)
+
+			await this.runMiddlewares(middlewares!, req, res)
 
 			const { correspondingRoute, data: reqData } = route
 
@@ -53,17 +61,92 @@ export class Router {
 		}
 	}
 
+	async runMiddlewares(middlewares: MiddlewareProps[], req: RequestWithPrototype, res: ResponseWithPrototype) {
+		// so when we do index++ in next(), we start with first one
+		let index = -1;
+
+		// function that will be run by middlewares to continue with
+		// request
+		const next = async () => {
+			index++
+
+			if (!middlewares) return
+			if (index < middlewares.length) {
+
+				// exec middleware handler, middlewares will execute the next
+				// func passed to them
+				middlewares[index].handler?.(req, res, next)
+			} else {
+				// if every middleware was ran succesfully, execute the
+				// finalHAndler which should be router.handleRequest() for the
+				// request to get to the corresponding controllers
+				return
+			}
+		}
+
+		// on first execute, execute the first middleware
+		next()
+
+	}
+
+	collectMiddlewares(req: RequestWithPrototype) {
+		const middlewares: MiddlewareProps[] = []
+
+		let curr = this.routes
+
+		const segments = path.normalize(req.url!).split(path.sep).filter(v => v !== "")
+
+		segments.forEach((segment, index) => {
+			curr = curr.children.get(segment)!
+
+			const isLast = index === segments.length - 1
+			for (const middleware of curr.middlewares) {
+
+				// if we're at the current req.url route, just push the
+				// middlewares without checking for bubble
+				if (isLast) {
+					middlewares.push(middleware)
+					continue
+				}
+
+				// if no middleware.bubble, dont register it to children
+				if (!middleware.bubble) {
+					continue
+				}
+
+
+				// else, if middleawre.bubble, register it
+				middlewares.push(middleware)
+			}
+		})
+
+
+		return middlewares
+	}
+
+
+
 	routeExists(segments: string[]) {
 		try {
 			let curr = this.routes;
 			let data = {}
 			let matched = false
 
+			if (segments.length === 0) {
+				return {
+					correspondingRoute: this.routes,
+					data: {}
+				}
+			}
+
 			// loop en los segments de req.url
 			for (const [index, segment] of segments.entries()) {
 
+				console.log(curr.segment === segment)
 				// si segment existe en las nested routes del nodo actual
+
 				if (curr.children.has(segment)) {
+					console.log("Pene")
 
 					// setea curr a ese hijo
 					curr = curr.children.get(segment)!
@@ -98,6 +181,8 @@ export class Router {
 				return null
 
 
+
+			console.log('asd', curr)
 			return {
 				correspondingRoute: curr,
 				data
@@ -108,10 +193,10 @@ export class Router {
 		}
 
 	}
-
 	// return a readable json of the Trie
 	serializeTrieNode(node: RouteTrieNode = this.routes): any {
 		const json = {};
+
 		for (const [segment, childNode] of node.children.entries()) {
 			json[segment] = this.serializeTrieNode(childNode);
 		}
@@ -121,6 +206,7 @@ export class Router {
 			isDynamic: node.isDynamic,
 			hasControllers: node.hasControllers,
 			isCatchAll: node.isCatchAll,
+			middlewares: node.middlewares,
 			nestedRoutes: json,
 		};
 	}
