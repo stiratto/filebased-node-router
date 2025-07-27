@@ -3,8 +3,9 @@
   "version": "1.0.0",
   "description": "",
   "main": "index.ts",
+  "type": "module",
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1",
+    "test": "vitest",
     "dev": "tsx watch index.ts",
     "start": "node index.ts",
     "lint": "eslint . --ext .ts",
@@ -23,10 +24,13 @@
   "devDependencies": {
     "@biomejs/biome": "2.0.6",
     "@types/busboy": "^1.5.4",
+    "@types/supertest": "^6.0.3",
     "@typescript-eslint/eslint-plugin": "^7.1.0",
     "@typescript-eslint/parser": "^7.1.0",
     "eslint": "^8.57.0",
     "prettier": "^3.2.5",
-    "ultracite": "5.0.29"
+    "supertest": "^7.1.4",
+    "ultracite": "5.0.29",
+    "vitest": "^3.2.4"
   }
 }

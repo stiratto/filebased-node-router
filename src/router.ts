@@ -4,7 +4,6 @@ import { Logger } from './lib/logger';
 import type { RequestWithPrototype } from './lib/request';
 import type { ResponseWithPrototype } from './lib/response';
 import { RouteTrieNode } from './lib/trie';
-import { transformPathIntoSegments } from './lib/utils';
 
 export class Router {
 	private routes: RouteTrieNode;
@@ -12,7 +11,6 @@ export class Router {
 
 	constructor(routes: RouteTrieNode) {
 		this.logger = new Logger();
-		this.routes = new RouteTrieNode();
 		this.routes = routes
 
 		this.logger.info("Routes loaded succesfully.")
@@ -22,6 +20,7 @@ export class Router {
 	async logRoutes() {
 		console.log(JSON.stringify(this.serializeTrieNode(this.routes), (_, value) => {
 			if (typeof value === 'function') return '[Function]';
+
 			return value;
 		}, 2));
 	}
@@ -36,10 +35,6 @@ export class Router {
 		const route = this.routeExists(segments);
 
 		if (route) {
-			const middlewares = this.collectMiddlewares(req)
-
-			await this.runMiddlewares(middlewares!, req, res)
-
 			const { correspondingRoute, data: reqData } = route
 
 			const controller = correspondingRoute.controllers.get(req.method as string)
@@ -47,6 +42,11 @@ export class Router {
 			if (!controller) {
 				return res.send("No controller associated.", 405)
 			}
+
+			const middlewares = this.collectMiddlewares(req)
+
+			await this.runMiddlewares(middlewares!, req, res)
+
 
 			if (reqData) req.params = reqData
 
@@ -89,39 +89,68 @@ export class Router {
 
 	}
 
+
+	/** 
+	 * This function is run when a request reaches the server, before it
+	 * reaches the controller. This basically collect all middlewares
+	 * in order, if a parent route has bubble: true, the middleware will
+	 * be added to the middleswares array that will be executed. No
+	 * ordering has to be done because it starts from the root node
+	 * going to the corresponding req.url route node, all middlewares
+	 * are already built and ordered by the middleware loader.
+	 *
+	 *	@param req Req object, used for exploring the Trie (req.url
+	 *	segments).
+	 *
+	 * */
 	collectMiddlewares(req: RequestWithPrototype) {
-		const middlewares: MiddlewareProps[] = []
+		try {
+			const middlewares: MiddlewareProps[] = []
+			let curr = this.routes
 
-		let curr = this.routes
+			const segments = path.normalize(req.url!).split(path.sep).filter(v => v !== "")
 
-		const segments = path.normalize(req.url!).split(path.sep).filter(v => v !== "")
+			segments.forEach((segment, index) => {
+				const isLast = index === segments.length - 1
 
-		segments.forEach((segment, index) => {
-			curr = curr.children.get(segment)!
-
-			const isLast = index === segments.length - 1
-			for (const middleware of curr.middlewares) {
-
-				// if we're at the current req.url route, just push the
-				// middlewares without checking for bubble
-				if (isLast) {
-					middlewares.push(middleware)
-					continue
+				if (!curr.children.has(segment)) {
+					return
 				}
 
-				// if no middleware.bubble, dont register it to children
-				if (!middleware.bubble) {
-					continue
+				try {
+					console.log("Looping middlewares of node", curr.segment)
+
+					for (const middleware of curr?.middlewares) {
+
+						// if we're at the current req.url route, just push the
+						// middlewares without checking for bubble
+						if (isLast) {
+							middlewares.push(middleware)
+							continue
+						}
+
+						// if no middleware.bubble, dont register it to children
+						if (!middleware.bubble) {
+							continue
+						}
+
+
+						// else, if middleawre.bubble, register it
+						middlewares.push(middleware)
+					}
+
+				} catch (err) {
+					throw new Error(`Couldn't loop middlewares of node ${curr.segment} in segment ${segment}`)
 				}
 
+				curr = curr.children.get(segment)!
+			})
 
-				// else, if middleawre.bubble, register it
-				middlewares.push(middleware)
-			}
-		})
+			return middlewares
 
-
-		return middlewares
+		} catch (err) {
+			throw err
+		}
 	}
 
 
@@ -130,7 +159,6 @@ export class Router {
 		try {
 			let curr = this.routes;
 			let data = {}
-			let matched = false
 
 			if (segments.length === 0) {
 				return {
@@ -139,45 +167,46 @@ export class Router {
 				}
 			}
 
+
+			// getId/123/asdasd -> 404
+
 			// loop en los segments de req.url
 			for (const [index, segment] of segments.entries()) {
 
 				// si segment existe en las nested routes del nodo actual
-
 				if (curr.children.has(segment)) {
-
-					// setea curr a ese hijo
 					curr = curr.children.get(segment)!
-					matched = true
+					continue
+				}
 
-					// si no hay ruta estatica, buscar dinamica o catchall si no
-					// hay dinamica
-				} else {
+				// si no hay ruta estatica, buscar dinamica o catchall si no
+				// hay dinamica
+				if (!curr.children.has(segment)) {
 					let foundDynamic = false
 					let foundCatchAll = false
 
 					for (const [_, child] of curr.children) {
+						// checks if is dynamic
 						if (child.isDynamic) {
 							data[child.segment.replace(":", "")] = segment
 							curr = child
 							foundDynamic = true
-							matched = true
 							break
 						} else if (!child.isDynamic && child.isCatchAll) {
 							data[child.segment.replace("...", "")] = segments.slice(index)
 							curr = child
 							foundCatchAll = true
-							matched = true
 							break
 						}
 					}
+
+					if (!foundDynamic && !foundCatchAll) {
+						return null
+					}
 				}
 
+
 			}
-
-			if (!matched)
-				return null
-
 
 
 			return {

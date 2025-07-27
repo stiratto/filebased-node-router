@@ -8,14 +8,15 @@ export const pad = (n: number) => {
 };
 
 export function defineProps(props: Partial<MiddlewareOptions>): MiddlewareOptions {
-  const opts: MiddlewareOptions = {
-    bubble: false,
+  let opts: MiddlewareOptions = {
+    bubble: true,
     registerBefore: ""
   }
-  if (props.bubble)
+
+  if (props.bubble !== undefined)
     opts.bubble = props.bubble
 
-  if (props.registerBefore)
+  if (props.registerBefore !== undefined)
     opts.registerBefore = props.registerBefore
 
   return opts

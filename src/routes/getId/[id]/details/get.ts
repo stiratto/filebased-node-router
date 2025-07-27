@@ -1,9 +1,5 @@
 const main = (req, res) => {
-	return {
-		status: 200, data: {
-			id: '123'
-		}
-	}
+	return { status: 200, data: '' }
 }
 
 export default { main }

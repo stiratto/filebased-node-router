@@ -1,12 +1,10 @@
-import { RequestWithPrototype } from "@/lib/request"
+import { defineProps } from "@/lib/utils";
 
-export const props = {}
+export const props = defineProps({
+	bubble: true
+})
 
-export const main = (req: RequestWithPrototype, res, next) => {
-	console.log('m1 on [id]/middlewares')
-	req.body = {
-		asd: 'asd'
-	}
-
+export const main = (req, res, next) => {
+	console.log("middleware on :id")
 	next()
 }

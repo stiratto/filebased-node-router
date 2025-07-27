@@ -23,9 +23,13 @@ export class Server {
 
   private router: Router;
   private logger: Logger;
+
   constructor(private port: number, private options: Options = {}) {
     this.logger = new Logger();
   }
+
+
+
 
   async start() {
 
@@ -85,10 +89,22 @@ export class Server {
     Object.setPrototypeOf(res, resProto);
   }
 
+  stop() {
+    return new Promise<void>((res, rej) => {
+      this.httpServer.close((err) => {
+        if (err) return rej(err)
+        res()
+      })
+    })
+  }
 
   decideOptions(res: ResponseWithPrototype, req: RequestWithPrototype) {
     const opts = this.options;
 
     if (opts?.cors?.enabled) cors(this.options, res, req);
+  }
+
+  public getHttpServer() {
+    return this.httpServer
   }
 }

@@ -18,5 +18,4 @@ export class RouteTrieNode {
 		this.isCatchAll = false;
 		this.middlewares = []
 	}
-
 }

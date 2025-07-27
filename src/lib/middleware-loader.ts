@@ -29,10 +29,11 @@ export class MiddlewareLoader {
 	}
 
 
-	// tenemos que encontrar el middleware y revisar si ese middleware
-	// aplica para la request actual
-	//
 
+	/** 
+	 * Reads global middlewares (src/middlewares/)
+	 *
+	 * */
 	async readGlobalMiddlewares() {
 		const rootPath = path.join("src", "middlewares")
 
@@ -48,37 +49,39 @@ export class MiddlewareLoader {
 
 	}
 
+	/**
+	 * Reads local middlewares using recursion
+	 *
+	 * */
 	async readLocalMiddlewares(p = "src/routes") {
 		try {
 			// get the current recursion path
 			const currentPath = path.resolve(p)
 			this.logger.info(`Exploring local middlewares in path ${currentPath}`)
 
-			const files = await getRoutesInsideDirectory(currentPath)
+			const routes = await getRoutesInsideDirectory(currentPath)
 
-			if (files.length === 0) {
+			if (routes.length === 0) {
 				return
 			}
 
-			for (const file of files) {
+			for (const route of routes) {
 				// gets the current file in the current folder path
-				const filePath = path.join(currentPath, file)
-				// stats of that file
-				const fileStats = await fs.stat(filePath)
+				const routePath = path.join(currentPath, route)
 
 				// register middlewares inside that folder               
-				if (fileStats.isDirectory() && file === "middlewares") {
-					this.logger.log(`Found middlewares/ folder in path ${filePath}`)
-					const middlewares = await fs.readdir(filePath);
+				if (route === "middlewares") {
+					this.logger.log(`Found middlewares/ folder in path ${routePath}`)
+					const middlewares = await fs.readdir(routePath);
 					for (const middleware of middlewares) {
 
-						await this.readMiddleware(path.join(filePath, middleware))
+						await this.readMiddleware(path.join(routePath, middleware))
 
 					}
 				}
 
-				if (fileStats.isDirectory() && file !== "middlewares") {
-					await this.readLocalMiddlewares(filePath)
+				if (route !== "middlewares") {
+					await this.readLocalMiddlewares(routePath)
 				}
 			}
 
@@ -88,9 +91,10 @@ export class MiddlewareLoader {
 		}
 	}
 
-	// run all middlewares when a request arrives
-
-	// registers a middleware
+	/** 
+	 * Reads middleware file content
+	 *
+	 * */
 	async readMiddleware(middlewarePath: string) {
 		try {
 			this.logger.log(`Registering middleware ${middlewarePath}`)
@@ -98,6 +102,8 @@ export class MiddlewareLoader {
 			// gets only the name, without the extension
 			const middlewareFilename = path.basename(middlewarePath).split('.')[0]
 
+			// middleware that will be passed to
+			// registerMiddlewareOnExistingRoute()
 			const middleware: MiddlewareProps = {
 				bubble: false,
 				appliesTo: "",
@@ -148,11 +154,13 @@ export class MiddlewareLoader {
 			}
 
 			middleware.handler = main;
+			if (!props) props = {} as any
 
 			props = ValidationMiddlewareOptions.parse(props)
+			console.log(middleware.name, props)
 
 
-			this.registerMiddlewareOnExistingRoute(middleware, props)
+			this.registerMiddlewareOnRoute(middleware, props)
 		} catch (err: any) {
 			throw err
 		}
@@ -160,7 +168,13 @@ export class MiddlewareLoader {
 
 
 
-	async registerMiddlewareOnExistingRoute(middleware: MiddlewareProps, props: MiddlewareOptions) {
+	/** 
+	 * Registers a middleware in the routes Trie
+	 *
+	 * @param middleware Middleware to be registered
+	 * @param props Parsed middleware props
+	 * */
+	async registerMiddlewareOnRoute(middleware: MiddlewareProps, props: MiddlewareOptions) {
 		try {
 			this.logger.error(`Registering middleware ${middleware.name}`)
 			const segments = transformPathIntoSegments(middleware.appliesTo)

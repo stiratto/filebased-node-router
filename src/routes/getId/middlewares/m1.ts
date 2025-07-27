@@ -6,7 +6,6 @@ export const props = defineProps({
 })
 
 export const main = (req: RequestWithPrototype, res, next) => {
-	console.log(req.body)
 	console.log('middleware1 on getId/middlewares')
 	next()
 }

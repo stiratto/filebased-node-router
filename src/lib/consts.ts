@@ -16,6 +16,6 @@ export const Method = [
 ] as const;
 
 export const ValidationMiddlewareOptions = z.object({
-  bubble: z.boolean().default(false),
+  bubble: z.boolean().default(true),
   registerBefore: z.string().default("")
 })
