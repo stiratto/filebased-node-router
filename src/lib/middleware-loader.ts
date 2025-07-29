@@ -26,6 +26,7 @@ export class MiddlewareLoader {
 		// locales
 		await this.readLocalMiddlewares()
 		this.router.logRoutes()
+
 	}
 
 
@@ -157,7 +158,6 @@ export class MiddlewareLoader {
 			if (!props) props = {} as any
 
 			props = ValidationMiddlewareOptions.parse(props)
-			console.log(middleware.name, props)
 
 
 			this.registerMiddlewareOnRoute(middleware, props)

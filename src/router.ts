@@ -4,6 +4,7 @@ import { Logger } from './lib/logger';
 import type { RequestWithPrototype } from './lib/request';
 import type { ResponseWithPrototype } from './lib/response';
 import { RouteTrieNode } from './lib/trie';
+import { checkForDynamicOrCatchAll } from './lib/utils';
 
 export class Router {
 	private routes: RouteTrieNode;
@@ -113,13 +114,15 @@ export class Router {
 			segments.forEach((segment, index) => {
 				const isLast = index === segments.length - 1
 
-				if (!curr.children.has(segment)) {
-					return
+				if (curr.children.has(segment)) {
+					curr = curr.children.get(segment)!
+				} else {
+					let fallback = checkForDynamicOrCatchAll(curr)
+					if (!fallback) return
+					curr = fallback
 				}
 
 				try {
-					console.log("Looping middlewares of node", curr.segment)
-
 					for (const middleware of curr?.middlewares) {
 
 						// if we're at the current req.url route, just push the
@@ -142,8 +145,6 @@ export class Router {
 				} catch (err) {
 					throw new Error(`Couldn't loop middlewares of node ${curr.segment} in segment ${segment}`)
 				}
-
-				curr = curr.children.get(segment)!
 			})
 
 			return middlewares
@@ -181,37 +182,27 @@ export class Router {
 
 				// si no hay ruta estatica, buscar dinamica o catchall si no
 				// hay dinamica
-				if (!curr.children.has(segment)) {
-					let foundDynamic = false
-					let foundCatchAll = false
+				const fallback = checkForDynamicOrCatchAll(curr)
+				if (!fallback) return
 
-					for (const [_, child] of curr.children) {
-						// checks if is dynamic
-						if (child.isDynamic) {
-							data[child.segment.replace(":", "")] = segment
-							curr = child
-							foundDynamic = true
-							break
-						} else if (!child.isDynamic && child.isCatchAll) {
-							data[child.segment.replace("...", "")] = segments.slice(index)
-							curr = child
-							foundCatchAll = true
-							break
-						}
-					}
-
-					if (!foundDynamic && !foundCatchAll) {
-						return null
-					}
+				if (fallback.isDynamic) {
+					data[fallback.segment.replace(":", "")] = segment
+					curr = fallback
 				}
 
-
+				if (fallback.isCatchAll) {
+					// we dont need to use spread operator because data isn't
+					// being used anywhere else
+					data[fallback.segment.replace("...", "")] = segments.slice(index)
+					curr = fallback
+					break
+				}
 			}
 
 
 			return {
 				correspondingRoute: curr,
-				data
+				data: { ...data }
 			}
 
 		} catch (err) {
