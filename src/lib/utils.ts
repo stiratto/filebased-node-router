@@ -2,6 +2,7 @@ import fs from 'fs/promises';
 import path from 'path';
 import { Method } from './consts';
 import { MiddlewareOptions } from './types';
+import { RouteTrieNode } from './trie';
 
 export const pad = (n: number) => {
   return n < 10 ? '0' + n : n.toString();
@@ -20,6 +21,15 @@ export function defineProps(props: Partial<MiddlewareOptions>): MiddlewareOption
     opts.registerBefore = props.registerBefore
 
   return opts
+}
+
+export function checkForDynamicOrCatchAll(curr: RouteTrieNode) {
+  for (const [, child] of curr.children) {
+    if (child.isDynamic) return child
+    if (!child.isDynamic && child.isCatchAll) return child
+  }
+
+  return undefined
 }
 
 export const getRoutesInsideDirectory = async (folderPath: string) => {
