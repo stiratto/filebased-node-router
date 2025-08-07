@@ -38,7 +38,6 @@ export class RouteLoader {
 	 */
 
 	private async readRoutes(startingPath = 'src/routes') {
-
 		try {
 			const routesRootFolder = path.resolve("src/routes");
 			let rootFolder = startingPath;
@@ -59,7 +58,6 @@ export class RouteLoader {
 				throw new Error(err)
 			}
 
-
 			// base case
 			if (currentFolderFiles.length <= 0) {
 				return;
@@ -73,12 +71,7 @@ export class RouteLoader {
 				const pathOfThisFolder = path.resolve(rootFolder, folder);
 
 				let controllers: string[] = [];
-				try {
-					controllers = await fs.readdir(pathOfThisFolder);
-				} catch (err) {
-					this.logger.error(err)
-
-				}
+				controllers = await fs.readdir(pathOfThisFolder);
 				// if route doesn't has controllers, mark that route in the
 				// TrieNode as hasControllers = false
 				let hasControllers = false;
@@ -90,6 +83,7 @@ export class RouteLoader {
 
 					if (isController) {
 						hasControllers = true;
+						break
 					}
 
 				}
@@ -150,6 +144,7 @@ export class RouteLoader {
 				if (segment.includes('...')) {
 					curr.isCatchAll = true
 				}
+				curr.depth = segments.length;
 
 				curr.segment = segment;
 

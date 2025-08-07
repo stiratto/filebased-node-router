@@ -1,10 +1,10 @@
 import { IncomingMessage } from 'node:http';
 
-// This will only have methods that do not rely on shared-state. This
-// won't have state either, things like body for example, it's a
-// no-no. This is so we avoid wrong state in requests.
-
-const req = Object.create(IncomingMessage.prototype);
+// this preserves the original prototype chain of IncomingMessage, so
+// when we do Object.setPrototypeOf(reqComingFromNode, req), we
+// preserve the prototype chain of reqComingFromNode which is
+// IncomingMessage -> Readable -> Stream, etc
+const Request = Object.create(IncomingMessage.prototype);
 
 export interface Request {
   // Just for typescript to be happy in files that we access
@@ -13,6 +13,13 @@ export interface Request {
   params: any
   query: any
 }
+
+Request.test = () => {
+  return 'test'
+}
+// prototype: Request -> IncomingMessage -> Readable -> Stream, so we
+// don't touch IncommingMessage
+const req = Object.create(Request)
 
 export type RequestWithPrototype = IncomingMessage & Request;
 export default req;

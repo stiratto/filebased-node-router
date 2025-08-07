@@ -6,11 +6,13 @@ export class RouteTrieNode {
 	segment: string;
 	hasControllers: boolean;
 	controllers: Map<string, Controller>;
+	depth: number;
 	isCatchAll: boolean;
 	middlewares: MiddlewareProps[]
 
 	constructor() {
 		this.children = new Map();
+		this.depth = 0;
 		this.isDynamic = false;
 		this.segment = '';
 		this.hasControllers = false;

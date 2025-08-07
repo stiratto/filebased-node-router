@@ -26,7 +26,6 @@ export class Router {
 		}, 2));
 	}
 
-
 	// executes when a request gets to the http.createServer in Server
 	// class
 	async handleRequest(req: RequestWithPrototype, res: ResponseWithPrototype) {
@@ -36,6 +35,7 @@ export class Router {
 		const route = this.routeExists(segments);
 
 		if (route) {
+			console.log(route.correspondingRoute.segment, route.correspondingRoute.controllers)
 			const { correspondingRoute, data: reqData } = route
 
 			const controller = correspondingRoute.controllers.get(req.method as string)
@@ -47,7 +47,6 @@ export class Router {
 			const middlewares = this.collectMiddlewares(req)
 
 			await this.runMiddlewares(middlewares!, req, res)
-
 
 			if (reqData) req.params = reqData
 
@@ -154,9 +153,40 @@ export class Router {
 		}
 	}
 
-
-
 	routeExists(segments: string[]) {
+
+		const dfs = (node: RouteTrieNode, index: number) => {
+			// use index instead of creating a whole new array,
+			// segments[index]
+
+			if (index === segments.length) {
+				return node
+			}
+
+			const curr = segments[index]
+
+			if (node.children.has(curr)) {
+				console.log(`${curr} exist`)
+				return dfs(node.children.get(curr)!, index + 1)
+
+			} else {
+				// search for dynamic or catchall, if no, null 
+				return null
+			}
+
+		}
+
+		const node = dfs(this.routes, 0)
+		return {
+			data: null,
+			correspondingRoute: node,
+		}
+
+
+	}
+
+
+	routeExists2(segments: string[]) {
 		try {
 			let curr = this.routes;
 			let data = {}
@@ -169,8 +199,6 @@ export class Router {
 			}
 
 
-			// getId/123/asdasd -> 404
-
 			// loop en los segments de req.url
 			for (const [index, segment] of segments.entries()) {
 
@@ -182,15 +210,22 @@ export class Router {
 
 				// si no hay ruta estatica, buscar dinamica o catchall si no
 				// hay dinamica
-				const fallback = checkForDynamicOrCatchAll(curr)
-				if (!fallback) return
 
-				if (fallback.isDynamic) {
-					data[fallback.segment.replace(":", "")] = segment
-					curr = fallback
+				const fallback = checkForDynamicOrCatchAll(curr, segments.slice(index))
+
+				if (!fallback) {
+					throw new Error('no fallback')
 				}
 
-				if (fallback.isCatchAll) {
+				if (fallback.isDynamic) {
+					console.log('dynamic', fallback.segment)
+					data[fallback.segment.replace(":", "")] = segment
+					curr = fallback
+					break
+				}
+
+				if (!fallback.isDynamic && fallback.isCatchAll) {
+					console.log('catchall', fallback.segment)
 					// we dont need to use spread operator because data isn't
 					// being used anywhere else
 					data[fallback.segment.replace("...", "")] = segments.slice(index)
@@ -223,8 +258,10 @@ export class Router {
 			isDynamic: node.isDynamic,
 			hasControllers: node.hasControllers,
 			isCatchAll: node.isCatchAll,
+			depth: node.depth,
 			middlewares: node.middlewares,
 			nestedRoutes: json,
+			controllers: node.controllers
 		};
 	}
 

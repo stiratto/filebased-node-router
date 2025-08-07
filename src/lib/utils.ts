@@ -1,8 +1,11 @@
 import fs from 'fs/promises';
 import path from 'path';
 import { Method } from './consts';
-import { MiddlewareOptions } from './types';
+import { MiddlewareOptions, TMethod } from './types';
 import { RouteTrieNode } from './trie';
+import { Controller } from './interfaces';
+import { RequestWithPrototype } from './request';
+import { ResponseWithPrototype } from './response';
 
 export const pad = (n: number) => {
   return n < 10 ? '0' + n : n.toString();
@@ -23,13 +26,86 @@ export function defineProps(props: Partial<MiddlewareOptions>): MiddlewareOption
   return opts
 }
 
-export function checkForDynamicOrCatchAll(curr: RouteTrieNode) {
-  for (const [, child] of curr.children) {
-    if (child.isDynamic) return child
-    if (!child.isDynamic && child.isCatchAll) return child
+// function run when no static routes are found in the same level
+// finds a dynamic or catchall route in the same level
+// priority: dynamic over catchall
+//
+
+export function checkForDynamicOrCatchAll(curr: RouteTrieNode, segmentsLeft) {
+  // 1: break when dynamic found bad solution, if we search for a
+  // catchall and we find a dynamic, RIP
+  //
+  // 2: continue at both if checks, return node at finish, if we
+  // search for a catchall and at the end we find a dynamic, node will
+  // be dynamic, RIP
+  //
+  // 3: flags, bad
+  //
+  // we just have to find a way of returning the correct route 
+  // making sure that we explored the whole level
+
+  let node: null | RouteTrieNode = null;
+
+  // /getId/123/123/123/123/123/
+  // :id
+  // ...ids
+
+
+  if (curr.children.size)
+
+    for (const [, child] of curr.children) {
+      checkForDynamicOrCatchAll(child)
+    }
+
+}
+
+export const createFakeRoute = (segment: string) => {
+  const fakeRoute: RouteTrieNode = {
+    isCatchAll: false,
+    isDynamic: false,
+    segment,
+    children: new Map(),
+    controllers: new Map(),
+    hasControllers: false,
+    middlewares: new Array()
   }
 
-  return undefined
+  return fakeRoute
+}
+// creates a fake controller to be injected into a Route.controllers[]
+// accepts the method of the controller and the main function of the
+// controller
+export const createDummyController = (method: TMethod, functionBody: (req?: RequestWithPrototype, res?: ResponseWithPrototype) => { status: number, data: object | string }) => {
+  const handler: Controller['handler'] = async (req, res) => functionBody(req, res)
+  return { method, handler }
+}
+
+export const createDynamicFakeRoute = async (segment: string) => {
+  const fakeRoute: RouteTrieNode = {
+    isCatchAll: false,
+    isDynamic: true,
+    segment,
+    children: new Map(),
+    controllers: new Map(),
+    hasControllers: false,
+    middlewares: new Array()
+  }
+
+  return fakeRoute
+}
+
+export const createCatchAllFakeRoute = async (segment: string) => {
+  const fakeRoute: RouteTrieNode = {
+    isCatchAll: true,
+    isDynamic: false,
+    segment,
+    children: new Map(),
+    controllers: new Map(),
+    hasControllers: false,
+    middlewares: new Array()
+  }
+
+  return fakeRoute
 }
 
 export const getRoutesInsideDirectory = async (folderPath: string) => {

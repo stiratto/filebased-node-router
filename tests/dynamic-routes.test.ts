@@ -18,4 +18,16 @@ describe('dynamic routes', () => {
 		expect(res.status).toBe(405)
 	})
 
+	test('should return 200 and body \'detailsBody\'', async () => {
+		const res = await request(server.getHttpServer()).get("/getId/24/details")
+		expect(res.status).toBe(200)
+		expect(res.body).toBe('detailsBody')
+	})
+
+	test('should return 404', async () => {
+		const res = await request(server.getHttpServer()).get("/getId/24/details/more")
+		expect(res.status).toBe(404)
+	})
+
+
 })

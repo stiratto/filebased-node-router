@@ -36,7 +36,7 @@ export class Server {
     const routes = await this.loadRoutes()
     this.router = new Router(routes);
 
-    await this.loadMiddlewares()
+    // await this.loadMiddlewares()
 
     this.httpServer = this.createServer()
 
@@ -75,7 +75,6 @@ export class Server {
         // execs middlewares before doing handleRequest()
 
         await this.router.handleRequest(req, res)
-        // await this.runMiddlewares(this.middlewares, req, res)
       }
     );
 
