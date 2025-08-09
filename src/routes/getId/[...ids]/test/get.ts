@@ -1,8 +1,9 @@
 const main = (req, res) => {
   return {
     status: 200,
-    data: '...ids'
+    data: '...ids/test'
   }
 }
 
-export default { main } 
+export default { main }
+

@@ -15,12 +15,16 @@ export class Router {
 		this.routes = routes
 
 		this.logger.info("Routes loaded succesfully.")
-
+		this.logRoutes()
 	}
 
 	async logRoutes() {
 		console.log(JSON.stringify(this.serializeTrieNode(this.routes), (_, value) => {
 			if (typeof value === 'function') return '[Function]';
+			if (value instanceof Map) {
+				// Convertir a objeto plano
+				return Object.fromEntries(value);
+			}
 
 			return value;
 		}, 2));
@@ -155,10 +159,9 @@ export class Router {
 
 	routeExists(segments: string[]) {
 
-		const dfs = (node: RouteTrieNode, index: number) => {
+		const dfs = (node: RouteTrieNode, index: number): RouteTrieNode | null => {
 			// use index instead of creating a whole new array,
 			// segments[index]
-
 			if (index === segments.length) {
 				return node
 			}
@@ -167,16 +170,42 @@ export class Router {
 
 			if (node.children.has(curr)) {
 				console.log(`${curr} exist`)
-				return dfs(node.children.get(curr)!, index + 1)
-
+				const result = dfs(node.children.get(curr)!, index + 1)
+				if (result) return result
 			} else {
-				// search for dynamic or catchall, if no, null 
-				return null
+				// static route doesn't exists, search for dynamic or catchall
+				// loops first dynamic nodes
+				for (const [segment, childNode] of node.children) {
+					if (childNode.isDynamic && !childNode.isCatchAll) {
+						const result = dfs(childNode, index + 1)
+						if (result) return result
+					}
+				}
+
+				for (const [segment, childNode] of node.children) {
+					if (!childNode.isDynamic && childNode.isCatchAll) {
+						// getId/123/123/123/123/123, i = 1, as long as i <= 6
+						for (let i = index; i <= segments.length; i++) {
+							console.log(i, segments[i])
+							console.log(childNode.segment)
+							const result = dfs(childNode, i)
+
+							if (result) return result
+						}
+					}
+				}
+
 			}
 
+			return null
 		}
 
 		const node = dfs(this.routes, 0)
+		if (!node) {
+			return null
+		}
+
+		this.logger.log(`Node to return: ${node.segment}`)
 		return {
 			data: null,
 			correspondingRoute: node,
