@@ -1,7 +1,7 @@
 const main = (req, res) => {
   return {
     status: 200,
-    data: '...ids'
+    data: req.params
   }
 }
 

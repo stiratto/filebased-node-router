@@ -36,13 +36,11 @@ export class Router {
 		const segments = req.url?.split('/').filter((v) => v != '')!;
 
 		// finds the correct route
-		const route = this.routeExists(segments);
+		const resolved = this.routeExists(segments);
 
-		if (route) {
-			console.log(route.correspondingRoute.segment, route.correspondingRoute.controllers)
-			const { correspondingRoute, data: reqData } = route
-
-			const controller = correspondingRoute.controllers.get(req.method as string)
+		if (resolved) {
+			const { route, data: resolvedData } = resolved
+			const controller = route.controllers.get(req.method as string)
 
 			if (!controller) {
 				return res.send("No controller associated.", 405)
@@ -52,7 +50,7 @@ export class Router {
 
 			await this.runMiddlewares(middlewares!, req, res)
 
-			if (reqData) req.params = reqData
+			if (resolvedData) req.params = resolvedData
 
 			const { status, data } = controller.handler(req, res)
 
@@ -60,7 +58,6 @@ export class Router {
 			res.send(data, status)
 		} else {
 			this.logger.error(`[404] ${req.url}`)
-			// res.writeHead(404, { 'Content-Type': 'text/plain' });
 			res.send('Not Found', 404);
 		}
 	}
@@ -157,58 +154,78 @@ export class Router {
 		}
 	}
 
-	routeExists(segments: string[]) {
+	routeExists(segments: string[]): { route: RouteTrieNode, data: any } | null {
 
-		const dfs = (node: RouteTrieNode, index: number): RouteTrieNode | null => {
+		const dfs = (node: RouteTrieNode, index: number) => {
+			// base case 
+			if (index === segments.length) {
+				return { node, data: null }
+			}
 			// use index instead of creating a whole new array,
 			// segments[index]
-			if (index === segments.length) {
-				return node
-			}
-
 			const curr = segments[index]
 
+			// checks for static, fast because direct check on hashmap keys (they are segments)
 			if (node.children.has(curr)) {
-				console.log(`${curr} exist`)
+				// dfs on that children if found, cut segments
 				const result = dfs(node.children.get(curr)!, index + 1)
-				if (result) return result
+
+				// what gets the job done
+				if (result) {
+					const { node, data } = result
+					return { node, data }
+				}
+
 			} else {
 				// static route doesn't exists, search for dynamic or catchall
 				// loops first dynamic nodes
-				for (const [segment, childNode] of node.children) {
+
+				// searches dynamic first
+				for (const [_, childNode] of node.children) {
 					if (childNode.isDynamic && !childNode.isCatchAll) {
 						const result = dfs(childNode, index + 1)
-						if (result) return result
-					}
-				}
-
-				for (const [segment, childNode] of node.children) {
-					if (!childNode.isDynamic && childNode.isCatchAll) {
-						// getId/123/123/123/123/123, i = 1, as long as i <= 6
-						for (let i = index; i <= segments.length; i++) {
-							console.log(i, segments[i])
-							console.log(childNode.segment)
-							const result = dfs(childNode, i)
-
-							if (result) return result
+						if (result) {
+							console.log(node.segment, 'pene')
+							return { node: result.node, data: segments.slice(index, index) }
 						}
 					}
 				}
 
+				// searches catchall if no dynamic was found
+				for (const [_, childNode] of node.children) {
+					if (!childNode.isDynamic && childNode.isCatchAll) {
+						// from the ...catchall node, loop starting from that
+						// segment to the rest segments, this allows us to use
+						// intermediate routes, getId/1/2/3/4/test/5/6/7/
+						for (let i = index; i <= segments.length; i++) {
+							const result = dfs(childNode, i)
+							if (result) {
+								return {
+									node: result.node,
+									data: segments.slice(index)
+								}
+							}
+						}
+					}
+				}
+
+				return null
 			}
-
-			return null
 		}
 
-		const node = dfs(this.routes, 0)
-		if (!node) {
+		const result = dfs(this.routes, 0)
+
+
+		if (!result) {
 			return null
 		}
+		const { node: nodeFound, data } = result
 
-		this.logger.log(`Node to return: ${node.segment}`)
+		this.logger.log(`Node to return: ${nodeFound.segment} ${data}`)
+
 		return {
-			data: null,
-			correspondingRoute: node,
+			data: data,
+			route: nodeFound,
 		}
 
 
