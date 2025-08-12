@@ -36,7 +36,7 @@ export class Server {
     const routes = await this.loadRoutes()
     this.router = new Router(routes);
 
-    // await this.loadMiddlewares()
+    await this.loadMiddlewares()
 
     this.httpServer = this.createServer()
 

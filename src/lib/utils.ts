@@ -31,31 +31,7 @@ export function defineProps(props: Partial<MiddlewareOptions>): MiddlewareOption
 // priority: dynamic over catchall
 //
 
-export function checkForDynamicOrCatchAll(curr: RouteTrieNode, segmentsLeft) {
-  // 1: break when dynamic found bad solution, if we search for a
-  // catchall and we find a dynamic, RIP
-  //
-  // 2: continue at both if checks, return node at finish, if we
-  // search for a catchall and at the end we find a dynamic, node will
-  // be dynamic, RIP
-  //
-  // 3: flags, bad
-  //
-  // we just have to find a way of returning the correct route 
-  // making sure that we explored the whole level
-
-  let node: null | RouteTrieNode = null;
-
-  // /getId/123/123/123/123/123/
-  // :id
-  // ...ids
-
-
-  if (curr.children.size)
-
-    for (const [, child] of curr.children) {
-      checkForDynamicOrCatchAll(child)
-    }
+export function checkForDynamicOrCatchAll(curr: RouteTrieNode) {
 
 }
 
@@ -157,7 +133,7 @@ export const getControllerFilesForRoute = async (segments: string[]) => {
 export const transformPathIntoSegments = (rawPath: string) =>
   rawPath
     .split(path.sep)
-    .filter(Boolean) // <- esto descarta strings vacíos como ''
+    .filter(Boolean)
     .map((segment) => {
       if (segment.includes('[') && segment.includes(']') && !segment.includes("...")) {
         return segment.replace('[', ':').replace(']', '');

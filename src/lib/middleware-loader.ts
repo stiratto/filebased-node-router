@@ -178,14 +178,15 @@ export class MiddlewareLoader {
 		try {
 			this.logger.error(`Registering middleware ${middleware.name}`)
 			const segments = transformPathIntoSegments(middleware.appliesTo)
-			const route = this.router.routeExists(segments)
-
-			if (!route?.correspondingRoute) {
+			const result = this.router.routeExists(segments)
+			if (!result) {
 				throw new Error("No route exists for that middleware")
 			}
 
+			const { route, data } = result
+
 			if (!props) {
-				route.correspondingRoute.middlewares.push(middleware)
+				route.middlewares.push(middleware)
 				return
 			}
 
@@ -196,21 +197,21 @@ export class MiddlewareLoader {
 			// handles register before prop
 			if (props?.registerBefore?.length > 1) {
 
-				const m = route.correspondingRoute.middlewares.find(m => m.name === props.registerBefore)
+				const m = route.middlewares.find(m => m.name === props.registerBefore)
 
 				if (!m) {
 					throw new Error(`Couldn't register middleware ${middleware.name} before ${props.registerBefore} because it doesn't exists.`)
 				}
 
-				const index = route.correspondingRoute.middlewares.indexOf(m)
+				const index = route.middlewares.indexOf(m)
 
 				// register this middleware before the registerBefore middleware                                                               
-				route.correspondingRoute.middlewares.splice(index, 0, middleware)
+				route.middlewares.splice(index, 0, middleware)
 
 			} else if (props?.registerBefore?.length > 1 && props.registerBefore === "*") {
-				route.correspondingRoute.middlewares.unshift(middleware)
+				route.middlewares.unshift(middleware)
 			} else {
-				route.correspondingRoute.middlewares.push(middleware);
+				route.middlewares.push(middleware);
 			}
 
 		} catch (err) {

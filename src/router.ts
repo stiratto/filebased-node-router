@@ -1,4 +1,3 @@
-import path from 'path';
 import { MiddlewareProps } from './lib/interfaces';
 import { Logger } from './lib/logger';
 import type { RequestWithPrototype } from './lib/request';
@@ -104,54 +103,100 @@ export class Router {
 	 *	segments).
 	 *
 	 * */
-	collectMiddlewares(req: RequestWithPrototype) {
-		try {
-			const middlewares: MiddlewareProps[] = []
-			let curr = this.routes
+	collectMiddlewares(req: RequestWithPrototype): Array<any> {
+		// empieza desde el nodo root, baja nivel por nivel hasta el nodo
+		// del ultimo segmento req.url
+		let curr = this.routes
+		// bajar de nivel
+		// tenemos que manejar los siguientes casos:
+		//
+		// - rutas estaticas
+		// - dinamicas
+		// - catchall
 
-			const segments = path.normalize(req.url!).split(path.sep).filter(v => v !== "")
+		// el problema viene con las rutas catchall, ejemplo, si se hace
+		// request a getId/12/12/12/12/12, y loopeamos en los segments de
+		// la req.url, al bajar de nivel, vamos a tomar en cuenta todos
+		// los 12/12/12/12/, cuando slo deberiamos tomar en ucenta un solo
+		// nodo, el nodo catchall
 
-			segments.forEach((segment, index) => {
-				const isLast = index === segments.length - 1
-
-				if (curr.children.has(segment)) {
-					curr = curr.children.get(segment)!
-				} else {
-					let fallback = checkForDynamicOrCatchAll(curr)
-					if (!fallback) return
-					curr = fallback
-				}
-
-				try {
-					for (const middleware of curr?.middlewares) {
-
-						// if we're at the current req.url route, just push the
-						// middlewares without checking for bubble
-						if (isLast) {
-							middlewares.push(middleware)
-							continue
-						}
-
-						// if no middleware.bubble, dont register it to children
-						if (!middleware.bubble) {
-							continue
-						}
+		// SOLO BAJA UNNNNNN NIVEL POR CADA ITERACION
 
 
-						// else, if middleawre.bubble, register it
-						middlewares.push(middleware)
+		let middlewaresToReturn: MiddlewareProps[] = []
+		const segments = req.url!.split('/').filter(val => val !== '')
+
+		const dfs = (node: RouteTrieNode, index: number, middlewares: MiddlewareProps[]) => {
+			this.logger.log(`[MIDDLEWARE READING] dfs() on ${node.segment} node`)
+
+			if (index === segments.length) {
+				// const tempMiddlewares = [...middlewares]
+				// node.middlewares.forEach((node) => tempMiddlewares.push(node))
+				middlewaresToReturn = middlewares
+				console.log(`returning on ${node.segment}`)
+				return node
+			}
+
+			// en cada iteracion recursiva, pushear los middlewares del nodo
+			// que coincide a middlewares
+
+			const curr = segments[index]
+			if (node.children.has(curr)) {
+				this.logger.log(`${curr} exists`)
+				// coincide, push middlewares
+				const tempMiddlewares: MiddlewareProps[] = [...middlewares]
+				for (const middleware of node.children.get(curr)!.middlewares) {
+					if (middleware.bubble) {
+						tempMiddlewares.push(middleware)
+						continue
 					}
-
-				} catch (err) {
-					throw new Error(`Couldn't loop middlewares of node ${curr.segment} in segment ${segment}`)
 				}
-			})
 
-			return middlewares
+				const result = dfs(node.children.get(curr)!, index + 1, tempMiddlewares)
 
-		} catch (err) {
-			throw err
+				if (result) return result
+			} else {
+				for (const child of node.children.values()) {
+					if (child.isDynamic && !child.isCatchAll) {
+						const tempMiddlewares: MiddlewareProps[] = [...middlewares]
+						for (const middleware of child.middlewares) {
+
+							if (middleware.bubble) {
+								tempMiddlewares.push(middleware)
+								continue
+							}
+						}
+						const result = dfs(child, index + 1, tempMiddlewares)
+						if (result) return result
+					}
+				}
+
+				for (const child of node.children.values()) {
+					if (!child.isDynamic && child.isCatchAll) {
+						const tempMiddlewares: MiddlewareProps[] = [...middlewares]
+						for (const middleware of child.middlewares) {
+							if (middleware.bubble) {
+								tempMiddlewares.push(middleware)
+								continue
+							}
+						}
+						for (let i = index; i <= segments.length; i++) {
+							const result = dfs(child, i, tempMiddlewares)
+							if (result) return result
+						}
+
+					}
+				}
+
+
+			}
+
 		}
+
+		dfs(curr, 0, [])
+		console.log("console log perra puta zorra asquerosa de puta mierda", middlewaresToReturn)
+
+		return middlewaresToReturn
 	}
 
 	routeExists(segments: string[]): { route: RouteTrieNode, data: any } | null {
@@ -161,6 +206,7 @@ export class Router {
 			if (index === segments.length) {
 				return { node, data: null }
 			}
+
 			// use index instead of creating a whole new array,
 			// segments[index]
 			const curr = segments[index]
@@ -185,7 +231,6 @@ export class Router {
 					if (childNode.isDynamic && !childNode.isCatchAll) {
 						const result = dfs(childNode, index + 1)
 						if (result) {
-							console.log(node.segment, 'pene')
 							return { node: result.node, data: segments.slice(index, index) }
 						}
 					}
@@ -221,7 +266,6 @@ export class Router {
 		}
 		const { node: nodeFound, data } = result
 
-		this.logger.log(`Node to return: ${nodeFound.segment} ${data}`)
 
 		return {
 			data: data,

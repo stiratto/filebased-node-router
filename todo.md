@@ -15,8 +15,13 @@
 # Todo
 
 [X] (Quick one) implement adding data on catchall request and dynamic request to *req.params*
-[ ] Re-design middleware's logic, it is currently using old route
-resolution logic (the noob and boring one)
+[X] Re-design middleware's logic, it is currently using old route
+resolution logic (the noob and boring one) -- THIS IS THE CURRENT MAIN GOAL
+[X] Remake collectMiddlewares() function, current one is broken.
+
+
+
+
 [ ] Regex patterns routing
 [ ] Pattern matching routing (* and things like that)
 [ ] Improve routing in general, implement parameter types, blabla
