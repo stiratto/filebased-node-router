@@ -3,7 +3,6 @@ import { Logger } from './lib/logger';
 import type { RequestWithPrototype } from './lib/request';
 import type { ResponseWithPrototype } from './lib/response';
 import { RouteTrieNode } from './lib/trie';
-import { checkForDynamicOrCatchAll } from './lib/utils';
 
 export class Router {
 	private routes: RouteTrieNode;
@@ -14,7 +13,7 @@ export class Router {
 		this.routes = routes
 
 		this.logger.info("Routes loaded succesfully.")
-		this.logRoutes()
+		// this.logRoutes()
 	}
 
 	async logRoutes() {
@@ -194,7 +193,6 @@ export class Router {
 		}
 
 		dfs(curr, 0, [])
-		console.log("console log perra puta zorra asquerosa de puta mierda", middlewaresToReturn)
 
 		return middlewaresToReturn
 	}
@@ -276,65 +274,6 @@ export class Router {
 	}
 
 
-	routeExists2(segments: string[]) {
-		try {
-			let curr = this.routes;
-			let data = {}
-
-			if (segments.length === 0) {
-				return {
-					correspondingRoute: this.routes,
-					data: {}
-				}
-			}
-
-
-			// loop en los segments de req.url
-			for (const [index, segment] of segments.entries()) {
-
-				// si segment existe en las nested routes del nodo actual
-				if (curr.children.has(segment)) {
-					curr = curr.children.get(segment)!
-					continue
-				}
-
-				// si no hay ruta estatica, buscar dinamica o catchall si no
-				// hay dinamica
-
-				const fallback = checkForDynamicOrCatchAll(curr, segments.slice(index))
-
-				if (!fallback) {
-					throw new Error('no fallback')
-				}
-
-				if (fallback.isDynamic) {
-					console.log('dynamic', fallback.segment)
-					data[fallback.segment.replace(":", "")] = segment
-					curr = fallback
-					break
-				}
-
-				if (!fallback.isDynamic && fallback.isCatchAll) {
-					console.log('catchall', fallback.segment)
-					// we dont need to use spread operator because data isn't
-					// being used anywhere else
-					data[fallback.segment.replace("...", "")] = segments.slice(index)
-					curr = fallback
-					break
-				}
-			}
-
-
-			return {
-				correspondingRoute: curr,
-				data: { ...data }
-			}
-
-		} catch (err) {
-			throw err
-		}
-
-	}
 	// return a readable json of the Trie
 	serializeTrieNode(node: RouteTrieNode = this.routes): any {
 		const json = {};
