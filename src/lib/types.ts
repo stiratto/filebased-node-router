@@ -1,5 +1,5 @@
 import { ServerOptions } from 'node:http';
-import type { Method, ValidationMiddlewareOptions } from './consts';
+import type { Method, ValidationMiddlewareOptions, ValidationWebSocketOptions } from './consts';
 import { ExtraOptions } from './interfaces';
 import z from 'zod';
 
@@ -13,4 +13,5 @@ export type TMethod = (typeof Method)[number];
 export type Options = ServerOptions & ExtraOptions;
 
 export type MiddlewareOptions = z.infer<typeof ValidationMiddlewareOptions>
+export type WebSocketOptions = z.infer<typeof ValidationWebSocketOptions>
 

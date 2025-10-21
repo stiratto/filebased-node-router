@@ -1,5 +1,4 @@
-import z from "zod";
-import { mimeTypes, ValidationMiddlewareOptions } from "./consts";
+import { mimeTypes } from "./consts";
 import { RequestWithPrototype } from "./request";
 import { ResponseWithPrototype } from "./response";
 import { MiddlewareOptions } from "./types";

@@ -1,16 +1,24 @@
-import { RouteTrieNode } from "./trie";
+import { RouteTrieNode } from "#/trie";
 import fs from "fs/promises"
 import path from "path"
-import { fileIsController, getControllerFilesForRoute, getRoutesInsideDirectory, joinSegments, transformPathIntoSegments } from "./utils";
-import { Logger } from "./logger";
-import { Controller } from "./interfaces";
+import { fileIsController, getControllerFilesForRoute, getRoutesInsideDirectory, joinSegments, transformPathIntoSegments } from "#/utils";
+import Logger from "#/logger";
+import { Controller } from "#/interfaces";
 import { pathToFileURL } from "url";
-import { Method } from "./consts";
-import { TMethod } from "./types";
+import { Method } from "#/consts";
+import { TMethod } from "#/types";
+import { WebSocketsInstance } from "#/websockets";
+import { isValidHttpMethodFile, parseHttpMethod } from "./utils";
 
-export class RouteLoader {
+// All this logic takes care of loading the routes and controllers
+// into the routes Trie. This does not loads middlewares.
+
+
+
+export default class RouteLoader {
 	private routes: RouteTrieNode;
 	private logger: Logger
+	private WebSocketsInstance: WebSocketsInstance
 
 	constructor() {
 		this.routes = new RouteTrieNode()
@@ -31,8 +39,8 @@ export class RouteLoader {
 	}
 
 	/**
-	 * Reads all routes in src/routes/ using recursivity and registers
-	 * them.
+	 * Reads all routes in src/routes/ using recursivity, registers a
+	 * route using registerRoute()
 	 *
 	 * @returns empty
 	 */
@@ -41,7 +49,7 @@ export class RouteLoader {
 		try {
 			const routesRootFolder = path.resolve("src/routes");
 			let rootFolder = startingPath;
-			this.logger.info(`Reading routes of path ${rootFolder}`)
+			// this.logger.info(`Reading routes of path ${rootFolder}`)
 
 			// if path is absolute it means we are in a nested directory
 			// (nested route)
@@ -74,24 +82,28 @@ export class RouteLoader {
 				controllers = await fs.readdir(pathOfThisFolder);
 				// if route doesn't has controllers, mark that route in the
 				// TrieNode as hasControllers = false
-				let hasControllers = false;
+				const routeProps = {
+					hasControllers: false,
+					hasWebSocket: false
+				}
 
+				const relative = path.relative(routesRootFolder, pathOfThisFolder);
+				const segments = transformPathIntoSegments(relative);
 				// check if route has controllers
 				for (const controller of controllers) {
 					const controllerPath = path.resolve(pathOfThisFolder, controller);
+
 					const isController = await fileIsController(controllerPath);
 
 					if (isController) {
-						hasControllers = true;
+						routeProps.hasControllers = true;
 						break
 					}
 
 				}
-				const relative = path.relative(routesRootFolder, pathOfThisFolder);
 
-				const segments = transformPathIntoSegments(relative);
 
-				this.registerRoute(segments, hasControllers);
+				this.registerRoute(segments, routeProps);
 				await this.readRoutes(pathOfThisFolder);
 
 			}
@@ -100,20 +112,27 @@ export class RouteLoader {
 		}
 	}
 
+	// To register a websocket into a route node, we have to find the
+	// node where the websocket will be inserted (into node.webSockets)
+	private async registerWebSocket(websocket: any, node: RouteTrieNode) {
+		this.logger.info('Registering websocket.')
+		node.webSockets.push(websocket)
+	}
 
 	/**
 	 * Adds a route into this.routes (Map)
 	 *
-	 * @param {string[]} segments: Segments, an array like: ['user', 'id'] which would be /user/id
-	 * @param {boolean} routeHasControllers
+	 * #param {string[]} segments: Segments, an array like: ['user', 'id'] which would be /user/id
+	 * #param {boolean} routeHasControllers
 	 *
-	 * @returns empty
+	 * #returns empty
 	 *
 	 */
 
-	private async registerRoute(segments: string[], routeHasControllers: boolean = false) {
-		this.logger.info(`Registering route with segments ${segments}`)
+	private async registerRoute(segments: string[], routeProps: { hasControllers: boolean, hasWebSocket: boolean }) {
+		// this.logger.info(`Registering route with segments ${segments}`)
 
+		const { hasControllers, hasWebSocket } = routeProps
 
 		if (!segments)
 			throw new Error('registerRoute() expects an array of segment(s)');
@@ -152,10 +171,8 @@ export class RouteLoader {
 				// segments, this is so we assign hasControllers to the last
 				// route, if we have /getId/[slug], only mark [slug] with
 				// hasControllers and not /getId/
-
-
 				if (index === segments.length - 1) {
-					curr.hasControllers = routeHasControllers;
+					curr.hasControllers = hasControllers;
 				}
 			});
 
@@ -166,54 +183,12 @@ export class RouteLoader {
 		}
 	}
 
-
-
-	// returns an array of controller names in the current route
-
-	private isValidHttpMethodFile(file: string) {
-		try {
-			// get only the file name, without the extension                                          
-			const indexOfLastDot = file.lastIndexOf('.');
-
-			const method = file
-				.slice(0, indexOfLastDot)
-				.toUpperCase() as (typeof Method)[number];
-
-			// file name must be a method name                                                        
-			if (!Method.includes(method)) {
-				return false
-			}
-
-			return true
-		} catch (err) {
-			throw err
-		}
-
-	}
-
-	private parseHttpMethod(fileName: string) {
-		try {
-			// get only the file name, without the extension                                          
-			const indexOfLastDot = fileName.lastIndexOf('.');
-
-			const method = fileName
-				.slice(0, indexOfLastDot)
-				.toUpperCase() as (typeof Method)[number];
-
-			return method
-
-
-		} catch (err: any) {
-			throw err
-		}
-	}
-
 	/** 
 	 *  Reads the controllers of a given route by joining the segments
 	 *  array
 	 *
-	 * @param {string[]} segments - An array of segments (['user', ':id', 'profile']) which is converted then to "/src/routes/[id]/profile"
-	 * @param {RouteTrieNode} node - Node in which the controllers will
+	 * #param {string[]} segments - An array of segments (['user', ':id', 'profile']) which is converted then to "/src/routes/[id]/profile"
+	 * #param {RouteTrieNode} node - Node in which the controllers will
 	 * be registered
 	 * 
 	 * */
@@ -227,21 +202,28 @@ export class RouteLoader {
 
 			const absoluteRoutePath = path.resolve("src/routes", ...joinedSegments)
 
-			this.logger.info(`Reading controllers of route ${absoluteRoutePath}`)
+			// this.logger.info(`Reading controllers of route ${absoluteRoutePath}`)
 
 			// folder files                                                                            
 
 			// we can have folders inside folders, so check if file is not a                           
 			// folder                                                                                  
 			let files = await getControllerFilesForRoute(joinedSegments)
+
 			for (const file of files) {
 
-				if (!this.isValidHttpMethodFile(file)) {
+				// checks if the file is not a valid http method controller
+				// (get.ts, post.ts, put.ts)
+				if (!isValidHttpMethodFile(file)) {
 					this.logger.error("File is not a valid HTTP method")
+					if (file.includes("ws")) {
+						this.registerWebSocket(file, node)
+						return
+					}
 					continue
 				}
 
-				const method = this.parseHttpMethod(file)
+				const method = parseHttpMethod(file)
 
 				await this.registerController(
 					method as typeof Method[number],
@@ -260,9 +242,9 @@ export class RouteLoader {
 	 * Registers a single controller on a given node route with the given
 	 * method, gets the method using the routePath
 	 *
-	 * @param {TMethod} method - Controller method (get | post | etc)
-	 * @param {RouteTrieNode} node - Node route in which the controller will be registered 
-	 * @param {string} routePath - Path of the route, used for getting the file whole path.
+	 * #param {TMethod} method - Controller method (get | post | etc)
+	 * #param {RouteTrieNode} node - Node route in which the controller will be registered 
+	 * #param {string} routePath - Path of the route, used for getting the file whole path.
 	 *
 	 *
 	 * 

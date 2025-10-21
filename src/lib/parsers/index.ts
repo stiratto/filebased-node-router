@@ -1,10 +1,10 @@
 import busboy from 'busboy';
-import { mimeTypes } from './consts';
-import type { RequestWithPrototype } from './request';
-import type { ResponseWithPrototype } from './response';
-import type { ContentTypes } from './types';
+import { mimeTypes } from '#/consts';
+import type { RequestWithPrototype } from '#/request';
+import type { ResponseWithPrototype } from '#/response';
+import type { ContentTypes } from '#/types';
 
-export class Parser {
+export default class Parser {
   contentType: ContentTypes;
   data: Buffer;
   body: any;

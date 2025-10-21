@@ -2,17 +2,18 @@ import http from 'node:http';
 import reqProto, {
   type Request,
   type RequestWithPrototype,
-} from '@/lib/request';
+} from '#/request/index';
 import resProto, {
   type Response,
   type ResponseWithPrototype,
-} from '@/lib/response';
+} from '#/response/index';
 import { Router } from '@/router';
-import { Logger } from './lib/logger';
+import Logger from '#/logger/index';
 import { cors } from './lib/options';
-import { RouteLoader } from './lib/route-loader';
-import { MiddlewareLoader } from './lib/middleware-loader';
+import RouteLoader from '#/routes/index';
+import MiddlewareLoader from '#/middlewares/loader';
 import { Options } from './lib/types';
+import { Duplex } from 'node:stream';
 
 
 export class Server {
@@ -28,7 +29,41 @@ export class Server {
     this.logger = new Logger();
   }
 
+  createServer() {
+    return http.createServer(
+      this.options,
+      async (req: RequestWithPrototype, res: ResponseWithPrototype) => {
+        this.logger.info(`[${req.method}] ${req.url}`);
+        // inject extra methods and properties
+        this.injectMethodsAndProperties(req, res);
 
+        req.params = null
+        req.query = null
+
+        if (this.options) {
+          this.decideOptions(res as ResponseWithPrototype, req);
+        }
+
+        // execs middlewares before doing handleRequest()
+
+        await this.router.handleRequest(req, res)
+      }
+    ).on('upgrade', this.onUpgrade);
+  }
+
+  async onUpgrade(req: RequestWithPrototype, socket: Duplex, head: Buffer) {
+    if (req.headers.upgrade !== "websocket") {
+      socket.end("HTTP/1.1 400 Bad Request\r\n\r\n");
+      return;
+    }
+    console.log('client sent an upgrade')
+    socket.write(
+      "HTTP/1.1 101 Switching Protocols\r\n" +
+      "Upgrade: websocket\r\n" +
+      "Connection: Upgrade\r\n"
+    );
+
+  }
 
 
   async start() {
@@ -57,28 +92,6 @@ export class Server {
     return middlewares
   }
 
-  createServer() {
-    return http.createServer(
-      this.options,
-      async (req: RequestWithPrototype, res: ResponseWithPrototype) => {
-        this.logger.info(`[${req.method}] ${req.url}`);
-        // inject extra methods and properties
-        this.injectMethodsAndProperties(req, res);
-
-        req.params = null
-        req.query = null
-
-        if (this.options) {
-          this.decideOptions(res as ResponseWithPrototype, req);
-        }
-
-        // execs middlewares before doing handleRequest()
-
-        await this.router.handleRequest(req, res)
-      }
-    );
-
-  }
 
   injectMethodsAndProperties(
     req: RequestWithPrototype,

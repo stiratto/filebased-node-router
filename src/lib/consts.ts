@@ -19,3 +19,6 @@ export const ValidationMiddlewareOptions = z.object({
   bubble: z.boolean().default(true),
   registerBefore: z.string().default("")
 })
+
+export const ValidationWebSocketOptions = z.object({
+})

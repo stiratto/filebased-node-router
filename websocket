@@ -1,0 +1,4 @@
+al encontrarnos con un websocket dentro de una ruta (un ws.ts), marcamos esa ruta (el nodo) como una ruta que contiene websockets
+cuando un cliente intente conectarse al websocket, resolvemos el path como siempre, pero solo tomando en cuenta nodes donde node.websockets = true
+al resolver la ruta (el nodo) cuando una request llega, la request vendria con un header Upgrade, eso lo podemos manejar con el .on("upgrade", () => {}) de node
+ahi manejariamos la conexion websocket como queramos, ahi hacemos la resolucion de rutas y todo eso

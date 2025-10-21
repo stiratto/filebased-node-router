@@ -1,10 +1,10 @@
-import { pad } from './utils';
+import { pad } from '#/utils';
 
 interface Options {
   timestamp?: boolean;
 }
 
-export class Logger {
+export default class Logger {
   private options: Options = {
     timestamp: true,
   };

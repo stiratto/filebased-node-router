@@ -11,7 +11,7 @@ export const pad = (n: number) => {
   return n < 10 ? '0' + n : n.toString();
 };
 
-export function defineProps(props: Partial<MiddlewareOptions>): MiddlewareOptions {
+export function defineMiddlewareProps(props: Partial<MiddlewareOptions>): MiddlewareOptions {
   let opts: MiddlewareOptions = {
     bubble: true,
     registerBefore: ""
@@ -25,6 +25,8 @@ export function defineProps(props: Partial<MiddlewareOptions>): MiddlewareOption
 
   return opts
 }
+
+
 
 // function run when no static routes are found in the same level
 // finds a dynamic or catchall route in the same level
@@ -153,7 +155,7 @@ export const fileIsController = async (filePath: string) => {
     }
 
     if (!Method.includes(filename as (typeof Method)[number])) {
-      throw new Error(`File ${filename} is not a valid controller.`);
+      return false;
     }
 
     return true;

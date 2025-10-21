@@ -1,7 +1,7 @@
-import { Parser } from "@/lib/parser";
-import { defineProps } from "@/lib/utils"
+import Parser from "#/parsers/index";
+import { defineMiddlewareProps } from "@/lib/utils"
 
-export const props = defineProps({
+export const props = defineMiddlewareProps({
 	bubble: true
 })
 

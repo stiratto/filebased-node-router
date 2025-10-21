@@ -1,6 +1,6 @@
-import { defineProps } from "@/lib/utils";
+import { defineMiddlewareProps } from "@/lib/utils";
 
-export const props = defineProps({
+export const props = defineMiddlewareProps({
 	bubble: true
 })
 
