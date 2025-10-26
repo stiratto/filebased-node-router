@@ -1,4 +1,4 @@
-import { describe, test } from "vitest"
+import { describe, expect, test } from "vitest"
 import request from "supertest"
 import { server } from "./setup"
 import { IncomingHttpHeaders } from "http"

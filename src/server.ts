@@ -48,15 +48,30 @@ export class Server {
 
         await this.router.handleRequest(req, res)
       }
-    ).on('upgrade', this.onUpgrade);
+    ).on('upgrade', this.onUpgrade.bind(this));
   }
 
+  // Once a client sends an Upgrade HTTP Request that is a valid
+  // WebSocket upgrade, we tell the client socket that the upgrade was
+  // succesfull. Then, we have to run the handleConnection() method
+  // from the websocket file handler that corresponds to the URL.
+  // First, resolve the URL and THEN run the handleConnection()
+  // method.
   async onUpgrade(req: RequestWithPrototype, socket: Duplex, head: Buffer) {
     if (req.headers.upgrade !== "websocket") {
       socket.end("HTTP/1.1 400 Bad Request\r\n\r\n");
       return;
     }
-    console.log('client sent an upgrade')
+
+
+    let url = req.url?.split("/")!
+    const resolvedSocketRoute = this.router.routeExists(url)
+    if (!resolvedSocketRoute || (resolvedSocketRoute && !resolvedSocketRoute.route.webSocket)) {
+      // handle
+      console.log("No route for that socket.")
+    }
+
+    console.log('client sent an upgrade', resolvedSocketRoute?.route.segment)
     socket.write(
       "HTTP/1.1 101 Switching Protocols\r\n" +
       "Upgrade: websocket\r\n" +

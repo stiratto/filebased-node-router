@@ -55,7 +55,7 @@ export class Router {
 			const controller = route.controllers.get(req.method as string)
 
 			if (!controller) {
-				return res.send("No controller associated.", 405)
+				return res.send("No controller associated", 405)
 			}
 
 			const middlewares = this.Middlewares.collectMiddlewares(req, this.routes)
@@ -64,7 +64,7 @@ export class Router {
 
 			if (resolvedData) req.params = resolvedData
 
-			const { status, data } = controller.handler(req, res)
+			const { status, data } = controller.handler(req, res) ?? { status: 200, data: {} }
 
 			this.logger.log(`[${status}] ${req.url}`)
 			res.send(data, status)
@@ -74,12 +74,13 @@ export class Router {
 		}
 	}
 
-
-
 	routeExists(segments: string[]): { route: RouteTrieNode, data: any } | null {
+		// normalize the segments array by removing empty items
+		segments = segments.filter((i) => i.length > 0)
 
 		const dfs = (node: RouteTrieNode, index: number) => {
-			// base case 
+			// base case, if current dfs() call index param is =
+			// segments.length, it means we explored all nodes, 
 			if (index === segments.length) {
 				return { node, data: null }
 			}
@@ -88,16 +89,22 @@ export class Router {
 			// segments[index]
 			const curr = segments[index]
 
+			// history/user/123
+
 			// checks for static, fast because direct check on hashmap keys (they are segments)
 			if (node.children.has(curr)) {
-				// dfs on that children if found, cut segments
+				// dfs on that children if found, cut segments (index + 1, we
+				// start from the next segment)
 				const result = dfs(node.children.get(curr)!, index + 1)
 
-				// what gets the job done
-				if (result) {
-					const { node, data } = result
-					return { node, data }
-				}
+				// what gets the job done, this basically is what "propagates"
+				// the result, if we explored all nodes (we reached the base
+				// case), that will cause a return, which cancels the current
+				// dfs(), returning the result, continues after the dfs() call
+				// in that recursive iteration, reaches the if (result) return
+				// result, and this logic will be executed on every reverse
+				// iteration
+				if (result) return result
 
 			} else {
 				// static route doesn't exists, search for dynamic or catchall
@@ -105,21 +112,31 @@ export class Router {
 
 				// searches dynamic first
 				for (const [_, childNode] of node.children) {
-					if (childNode.isDynamic && !childNode.isCatchAll) {
+
+					if (childNode.isDynamic) {
+						// same static logic of propagation in static routes applies both here and in the catchall part
 						const result = dfs(childNode, index + 1)
 						if (result) {
-							return { node: result.node, data: segments.slice(index, index) }
+							const data = segments.slice(index, index + segments.length)
+							const node = result.node
+							return { node, data }
 						}
 					}
 				}
 
 				// searches catchall if no dynamic was found
-				for (const [_, childNode] of node.children) {
-					if (!childNode.isDynamic && childNode.isCatchAll) {
-						// from the ...catchall node, loop starting from that
-						// segment to the rest segments, this allows us to use
-						// intermediate routes, getId/1/2/3/4/test/5/6/7/
-						for (let i = index; i <= segments.length; i++) {
+				for (const [_, childNode] of node.children) { // 
+					if (childNode.isCatchAll) {
+						// this allows combined catchall and dynamic/static
+						// routes, /history/user/123/456/789/333/44/details
+						// start frm index + 1 (from the second segment, we dont
+						// need to explore the current index)
+						for (let i = index + 1; i <= segments.length; i++) {
+							// childNode would always be 123, lets say we have url 
+							// history/user/123/456/789/details
+							// we currently are in 123, curr index is 2, childNode
+							// 123 = (123 node).
+							// we enter on this loop, we do dfs(123node, )
 							const result = dfs(childNode, i)
 							if (result) {
 								return {
@@ -129,7 +146,7 @@ export class Router {
 							}
 						}
 					}
-				}
+				} // 
 
 				return null
 			}
@@ -143,12 +160,10 @@ export class Router {
 		}
 		const { node: nodeFound, data } = result
 
-
 		return {
 			data: data,
 			route: nodeFound,
 		}
-
 
 	}
 
@@ -162,7 +177,7 @@ export class Router {
 		}
 
 		return {
-			webSockets: node.webSockets,
+			webSocket: node.webSocket,
 			segment: node.segment,
 			isDynamic: node.isDynamic,
 			hasControllers: node.hasControllers,

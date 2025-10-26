@@ -10,7 +10,7 @@ export interface Route {
 }
 
 export interface Controller {
-  handler: (req?: RequestWithPrototype, res?: ResponseWithPrototype) => any;
+  handler: (req?: RequestWithPrototype, res?: ResponseWithPrototype) => { status: number, data: any };
 }
 
 export interface MiddlewareProps {
@@ -38,4 +38,10 @@ export interface CorsOptions {
 export interface ExtraOptions {
   cors?: CorsOptions;
   parsers?: (keyof typeof mimeTypes)[];
+}
+
+export interface WebSocket {
+  // This method (defined by the user) runs when a client connects to
+  // the socket.
+  handleConnection: () => void;
 }

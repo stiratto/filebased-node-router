@@ -9,8 +9,8 @@ export class RouteTrieNode {
 	depth: number;
 	isCatchAll: boolean;
 	middlewares: MiddlewareProps[]
-	webSockets: any[]
-
+	webSocket: boolean;
+	socketEventHandlers: any;
 
 	constructor() {
 		this.children = new Map();
@@ -21,7 +21,9 @@ export class RouteTrieNode {
 		this.controllers = new Map();
 		this.isCatchAll = false;
 		this.middlewares = []
-		this.webSockets = []
+		this.webSocket = false
+		this.socketEventHandlers = null;
+
 	}
 
 }

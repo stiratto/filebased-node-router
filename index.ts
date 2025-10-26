@@ -7,4 +7,5 @@ const server = new Server(4000, {
   },
 });
 
-server.start()
+(async () => await server.start())()
+

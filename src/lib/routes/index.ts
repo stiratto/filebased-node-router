@@ -9,6 +9,7 @@ import { Method } from "#/consts";
 import { TMethod } from "#/types";
 import { WebSocketsInstance } from "#/websockets";
 import { isValidHttpMethodFile, parseHttpMethod } from "./utils";
+import { WebSocketOptions } from "../websockets/types";
 
 // All this logic takes care of loading the routes and controllers
 // into the routes Trie. This does not loads middlewares.
@@ -114,9 +115,11 @@ export default class RouteLoader {
 
 	// To register a websocket into a route node, we have to find the
 	// node where the websocket will be inserted (into node.webSockets)
-	private async registerWebSocket(websocket: any, node: RouteTrieNode) {
-		this.logger.info('Registering websocket.')
-		node.webSockets.push(websocket)
+	private async registerWebSocket(socketFilePath: any, node: RouteTrieNode) {
+		this.logger.info(`Registering websocket ${socketFilePath}`)
+		const joinedPath = socketFilePath + "/ws.ts"
+
+		node.webSocket = true
 	}
 
 	/**
@@ -217,7 +220,7 @@ export default class RouteLoader {
 				if (!isValidHttpMethodFile(file)) {
 					this.logger.error("File is not a valid HTTP method")
 					if (file.includes("ws")) {
-						this.registerWebSocket(file, node)
+						this.registerWebSocket(absoluteRoutePath, node)
 						return
 					}
 					continue

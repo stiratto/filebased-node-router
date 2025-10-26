@@ -6,20 +6,18 @@ import { IncomingMessage } from 'node:http';
 // IncomingMessage -> Readable -> Stream, etc
 const Request = Object.create(IncomingMessage.prototype);
 
-export interface Request {
+export interface TRequest {
   // Just for typescript to be happy in files that we access
   // `req.body`
   body: any;
   params: any
   query: any
+  test: () => any
 }
 
-Request.test = () => {
-  return 'test'
-}
 // prototype: Request -> IncomingMessage -> Readable -> Stream, so we
 // don't touch IncommingMessage
 const req = Object.create(Request)
 
-export type RequestWithPrototype = IncomingMessage & Request;
+export type RequestWithPrototype = IncomingMessage & TRequest;
 export default req;
