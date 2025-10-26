@@ -40,7 +40,7 @@ into the trie, if we stumble upon a ws.ts file, we have to register
 this websocket in the route that it is in.
 So, the route should have an array of websockets handlers.
 
-[ ] Instead of registering just the name of the websocket (not useful,
+[X] Instead of registering just the name of the websocket (not useful,
 obviously), register a whole WebSocket object containing the handlers
 and custom props that we define later on.
 
@@ -48,5 +48,5 @@ and custom props that we define later on.
 
 [ ] Be able to define useful props to each websocket, like
 maxConnections or something like that.
-[ ] Resolve routes to websocket routes.
+[X] Resolve routes to websocket routes.
 

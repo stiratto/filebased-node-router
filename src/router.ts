@@ -178,6 +178,7 @@ export class Router {
 
 		return {
 			webSocket: node.webSocket,
+			webSocketHandlers: node.socketEventHandlers,
 			segment: node.segment,
 			isDynamic: node.isDynamic,
 			hasControllers: node.hasControllers,

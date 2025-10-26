@@ -48,6 +48,9 @@ export class Server {
 
         await this.router.handleRequest(req, res)
       }
+      // We have to bind this to this.onUpgrade because Node (on()
+      // method) doesn't has our this on his context, it has his own
+      // this.
     ).on('upgrade', this.onUpgrade.bind(this));
   }
 
@@ -65,18 +68,21 @@ export class Server {
 
 
     let url = req.url?.split("/")!
-    const resolvedSocketRoute = this.router.routeExists(url)
-    if (!resolvedSocketRoute || (resolvedSocketRoute && !resolvedSocketRoute.route.webSocket)) {
+    const resolved = this.router.routeExists(url)
+    if (!resolved || (resolved && !resolved.route.webSocket)) {
       // handle
       console.log("No route for that socket.")
-    }
 
-    console.log('client sent an upgrade', resolvedSocketRoute?.route.segment)
-    socket.write(
-      "HTTP/1.1 101 Switching Protocols\r\n" +
-      "Upgrade: websocket\r\n" +
-      "Connection: Upgrade\r\n"
-    );
+    }
+    const node = resolved!.route;
+    const eventsMap = node.socketEventHandlers;
+    const connHandler = eventsMap.get('conn');
+    const disconnHandler = eventsMap.get('disconn');
+    connHandler?.(socket);
+    socket.on('end', () => {
+      disconnHandler?.()
+    })
+
 
   }
 

@@ -9,7 +9,7 @@ import { Method } from "#/consts";
 import { TMethod } from "#/types";
 import { WebSocketsInstance } from "#/websockets";
 import { isValidHttpMethodFile, parseHttpMethod } from "./utils";
-import { WebSocketOptions } from "../websockets/types";
+import { WebSocketOptions, WebSocketStructure } from "../websockets/types";
 
 // All this logic takes care of loading the routes and controllers
 // into the routes Trie. This does not loads middlewares.
@@ -113,11 +113,20 @@ export default class RouteLoader {
 		}
 	}
 
-	// To register a websocket into a route node, we have to find the
-	// node where the websocket will be inserted (into node.webSockets)
 	private async registerWebSocket(socketFilePath: any, node: RouteTrieNode) {
 		this.logger.info(`Registering websocket ${socketFilePath}`)
-		const joinedPath = socketFilePath + "/ws.ts"
+		const joinedPath = pathToFileURL(socketFilePath + "/ws.ts")
+		const importedFile = await import(joinedPath.href)
+		// To register a WebSocket, we have to mark a node with webSocket
+		// = true and register the socket event handlers on the node
+		// directly, this way, when some event happens, for example let's
+		// say an upgrade response happens, the handleConnection() handler from
+		// that node  is executed
+		const { handleMessage, handleConnection, handleDisconnection, props } = importedFile as WebSocketStructure
+
+		node.socketEventHandlers.set("conn", handleConnection)
+		node.socketEventHandlers.set("disconn", handleDisconnection)
+		node.socketEventHandlers.set("msg", handleMessage)
 
 		node.webSocket = true
 	}

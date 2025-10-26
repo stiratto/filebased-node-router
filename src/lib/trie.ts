@@ -10,7 +10,7 @@ export class RouteTrieNode {
 	isCatchAll: boolean;
 	middlewares: MiddlewareProps[]
 	webSocket: boolean;
-	socketEventHandlers: any;
+	socketEventHandlers: Map<'conn' | 'msg' | 'disconn', Function>;
 
 	constructor() {
 		this.children = new Map();
@@ -22,7 +22,7 @@ export class RouteTrieNode {
 		this.isCatchAll = false;
 		this.middlewares = []
 		this.webSocket = false
-		this.socketEventHandlers = null;
+		this.socketEventHandlers = new Map();
 
 	}
 
